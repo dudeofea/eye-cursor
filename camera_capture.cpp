@@ -164,23 +164,35 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	int eye_region_width = face.width * (EYE_WIDTH);
 	int eye_region_height = face.width * (EYE_HEIGHT);
 	int eye_region_top = face.height * (EYE_TOP);
+	int eye_region_side =face.width  * (EYE_SIDE);
 	Rect left_eye_box(
-		face.width*(EYE_SIDE),
+		eye_region_side,
 		eye_region_top,
 		eye_region_width,
 		eye_region_height
 	);
 	Rect right_eye_box(
-		face.width - eye_region_width - face.width*(EYE_SIDE),
+		face.width - eye_region_width - eye_region_side,
 		eye_region_top,
 		eye_region_width,
 		eye_region_height
 	);
 
-	//get center / eye corner
+	//get left center / eye corner
 	Point left_pupil, left_corner;
 	left_pupil = getEyeCenter(face_frame, left_eye_box);
 	getEyeCorners(face_frame_color, left_eye_box, &left_corner, NULL);
+	//fix offset
+	left_corner.x += eye_region_side;
+	left_corner.y += eye_region_top;
+
+	//TODO: somehow take into account the fact that looking right with
+	//your left eye causes the scelra detection to fail and vice versa
+	//with the right eye. Use somekind of confidence weight, and/or alternate
+	//which center's y is used primarily, and add some jitter handling.
+
+	circle(face_frame, left_corner, 3, 200);
+	imshow("cam", face_frame);
 
 	Point left_vec = left_corner - left_pupil;
 	printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
