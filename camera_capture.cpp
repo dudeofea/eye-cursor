@@ -31,8 +31,7 @@ int main() {
 		cout << "cannot open camera";
 	}
 
-	//load up filters
-	Mat high_pass_kernel = (Mat_<double>(3,3) << 0, 1, 0, 1, -4, 1, 0, 1, 0);
+	//load up face detection
 	String face_cascade_name = "haarcascade_frontalface_alt.xml";
 	if(!face_cascade.load(face_cascade_name)){
 		cout << "Could not find face cascade file: " + face_cascade_name + "\n";
@@ -43,19 +42,6 @@ int main() {
 	while (true) {
 		Mat cameraFrame;
 		stream1.read(cameraFrame);
-
-		/// Applying Gaussian blur
-		//GaussianBlur( cameraFrame, cameraFrame, Size( 0, 0 ), 10);
-
-		// Apply highpass filter
-		// filter2D(
-		// 	cameraFrame, cameraFrame,	//src, dst
-		// 	-1, 						//ddepth
-		// 	high_pass_kernel,			//kernel
-		// 	Point( -1, -1 ),			//anchor
-		// 	0,							//delta
-		// 	BORDER_DEFAULT
-		// );
 
 		getGazePosition(cameraFrame);
 
@@ -95,63 +81,6 @@ void getGazePosition(Mat &frame){
 	//imshow("cam", frame);
 }
 
-//get positions of corners of eye
-void getEyeCorners(Mat &face_frame, Rect eye, Point *max_p, Point *min_p){
-	//crop eye to get rid of some noise
-	int crop = 10;
-	eye.y += crop;
-	eye.height -= crop * 2;
-	
-	Mat eye_color = face_frame(eye);
-	Mat eye_scelra;
-	
-	//convert to HSV and get saturation channel
-	cvtColor(eye_color, eye_scelra, CV_RGB2HSV);
-	std::vector<Mat> hsvChannels(3);
-	split(eye_scelra, hsvChannels);
-	eye_scelra = hsvChannels[1];
-
-	//threshold
-	threshold(eye_scelra, eye_scelra, 80, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
-
-	//erode to get rid of noise points
-	Mat eroder = getStructuringElement( MORPH_CROSS,
-		Size(3, 3),
-		Point(1, 1)
-	);
-	erode(eye_scelra, eye_scelra, eroder);
-
-	//calc min/max x and associated y's
-	Point max = Point(0,0);
-	Point min = Point(eye_scelra.cols, 0);
-	for (int y = 0; y < eye_scelra.rows; ++y)
-	{
-		uchar* row = eye_scelra.ptr<uchar>(y);
-		for (int x = 0; x < eye_scelra.cols; ++x)
-		{
-			if(row[x] > 0){
-				if (x < min.x)
-				{
-					min = Point(x, y);
-				}
-				if (x > max.x)
-				{
-					max = Point(x, y);
-				}
-			}
-		}
-	}
-	//adjust for crop
-	min.y += crop;
-	max.y += crop;
-	if(max_p != NULL){
-		*max_p = max;
-	}
-	if(min_p != NULL){
-		*min_p = min;
-	}
-}
-
 //get position of pupils
 void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	Mat face_frame = frame_gray(face);
@@ -179,23 +108,38 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	);
 
 	//get left center / eye corner
-	Point left_pupil, left_corner;
+	Point left_pupil, left_corner_max, left_corner_min;
 	left_pupil = getEyeCenter(face_frame, left_eye_box);
-	getEyeCorners(face_frame_color, left_eye_box, &left_corner, NULL);
+	getEyeCorners(face_frame_color, left_eye_box, &left_corner_max, &left_corner_min);
 	//fix offset
-	left_corner.x += eye_region_side;
-	left_corner.y += eye_region_top;
+	left_corner_min.x += eye_region_side;
+	left_corner_min.y += eye_region_top;
+	left_corner_max.x += eye_region_side;
+	left_corner_max.y += eye_region_top;
+
+	//get right center / eye corner
+	Point right_pupil, right_corner_max, right_corner_min;
+	//right_pupil = getEyeCenter(face_frame, right_eye_box);
+	getEyeCorners(face_frame_color, right_eye_box, &right_corner_max, &right_corner_min);
+	//fix offset
+	right_corner_min.x += face.width - eye_region_width - eye_region_side;
+	right_corner_min.y += eye_region_top;
+	right_corner_max.x += face.width - eye_region_width - eye_region_side;
+	right_corner_max.y += eye_region_top;
 
 	//TODO: somehow take into account the fact that looking right with
 	//your left eye causes the scelra detection to fail and vice versa
 	//with the right eye. Use somekind of confidence weight, and/or alternate
 	//which center's y is used primarily, and add some jitter handling.
 
-	circle(face_frame, left_corner, 3, 200);
-	imshow("cam", face_frame);
+	circle(face_frame, left_corner_min, 3, 0);
+	circle(face_frame, right_corner_min, 3, 0);
+	circle(face_frame, left_corner_max, 3, 0);
+	circle(face_frame, right_corner_max, 3, 0);
+	//imshow("cam", face_frame);
 
-	Point left_vec = left_corner - left_pupil;
-	printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
+	//Point left_vec = left_corner - left_pupil;
+	//printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
 }
 
 //returns a matrix with the gradient in the x direction
@@ -332,12 +276,67 @@ Point getEyeCenter(Mat &face, Rect eye){
 	// scale all the values down, basically averaging them
 	double numGradients = (weight.rows*weight.cols);
 	Mat out;
-	outSum.convertTo(out, CV_32F,1.0/numGradients);
+	outSum.convertTo(out, CV_32F, 1.0/numGradients);
 	//-- Find the maximum point
 	Point maxP;
 	double maxVal;
 	minMaxLoc(out, NULL,&maxVal,NULL,&maxP);
-	circle(eye_box, maxP, 3, 200);
-	//imshow("cam", eye_box);
+	circle(out, maxP, 3, 200);
+	imshow("cam", out/40);
 	return maxP;
+}
+
+//get positions of corners of eye
+void getEyeCorners(Mat &face_frame, Rect eye, Point *max_p, Point *min_p){
+	//crop eye to get rid of some noise
+	int crop = 10;
+	eye.y += crop;
+	eye.height -= crop * 2;
+	
+	Mat eye_color = face_frame(eye);
+	Mat eye_scelra;
+	
+	//convert to HSV and get saturation channel
+	cvtColor(eye_color, eye_scelra, CV_RGB2HSV);
+	std::vector<Mat> hsvChannels(3);
+	split(eye_scelra, hsvChannels);
+	eye_scelra = hsvChannels[1];
+
+	//threshold
+	threshold(eye_scelra, eye_scelra, 70, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
+
+	//TODO: possibly find pixel groups by clustering
+	//and remove the smaller ones
+
+	//calc min/max x and associated y's
+	Point max = Point(0,0);
+	Point min = Point(eye_scelra.cols, 0);
+	for (int y = 0; y < eye_scelra.rows; ++y)
+	{
+		uchar* row = eye_scelra.ptr<uchar>(y);
+		for (int x = 0; x < eye_scelra.cols; ++x)
+		{
+			if(row[x] > 0){
+				if (x < min.x)
+				{
+					min = Point(x, y);
+				}
+				if (x > max.x)
+				{
+					max = Point(x, y);
+				}
+			}
+		}
+	}
+	// circle(eye_scelra, min, 3, 200);
+	//imshow("cam", eye_scelra);
+	//adjust for crop
+	min.y += crop;
+	max.y += crop;
+	if(max_p != NULL){
+		*max_p = max;
+	}
+	if(min_p != NULL){
+		*min_p = min;
+	}
 }
