@@ -65,72 +65,8 @@ int main() {
 	return 0;
 }
 
-Mat toHueScale(Mat img){
-	double h = 0.0, s = 0.5, v = 0.5, ff, p, q, t;
-	//make color array
-	std::vector<cv::Mat> rgb_mat;
-	rgb_mat.push_back(Mat::zeros(img.rows, img.cols, CV_64F));
-	rgb_mat.push_back(Mat::zeros(img.rows, img.cols, CV_64F));
-	rgb_mat.push_back(Mat::zeros(img.rows, img.cols, CV_64F));
-	for (int i = 0; i < img.rows; ++i)
-	{
-		double* img_p = img.ptr<double>(i);
-		double* r_mat = rgb_mat[2].ptr<double>(i);
-		double* g_mat = rgb_mat[1].ptr<double>(i);
-		double* b_mat = rgb_mat[0].ptr<double>(i);
-		for (int j = 0; j < img.cols; ++j)
-		{
-			//Turn brightness into hue
-			h = 360.0 * img_p[j];
-			//convert to RGB
-			h /= 60.0;
-			long k = (long)h;
-			ff = h - k;
-			p = v * (1.0 - s);
-			q = v * (1.0 - (s * ff));
-			t = v * (1.0 - (s * (1.0 - ff)));
-			switch(k) {
-			case 0:
-				r_mat[j] = v;
-				g_mat[j] = t;
-				b_mat[j] = p;
-			break;
-			case 1:
-				r_mat[j] = q;
-				g_mat[j] = v;
-				b_mat[j] = p;
-			break;
-			case 2:
-				r_mat[j] = p;
-				g_mat[j] = v;
-				b_mat[j] = t;
-			break;
-			case 3:
-				r_mat[j] = p;
-				g_mat[j] = q;
-				b_mat[j] = v;
-			break;
-			case 4:
-				r_mat[j] = t;
-				g_mat[j] = p;
-				b_mat[j] = v;
-			break;
-			case 5:
-			default:
-				r_mat[j] = v;
-				g_mat[j] = p;
-				b_mat[j] = q;
-			break;
-			}
-		}
-	}
-	Mat color;
-	merge(rgb_mat, color);
-	return color;
-}
-
 void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face);
-void getEyeCorners(Mat &face, Rect eye);
+void getEyeCorners(Mat &face_frame, Rect eye, Point *max_p, Point *min_p);
 Point getEyeCenter(Mat &face, Rect eye);
 
 //returns a 2D vector of where the eyes are pointing
@@ -160,7 +96,12 @@ void getGazePosition(Mat &frame){
 }
 
 //get positions of corners of eye
-void getEyeCorners(Mat &face_frame, Rect eye){
+void getEyeCorners(Mat &face_frame, Rect eye, Point *max_p, Point *min_p){
+	//crop eye to get rid of some noise
+	int crop = 10;
+	eye.y += crop;
+	eye.height -= crop * 2;
+	
 	Mat eye_color = face_frame(eye);
 	Mat eye_scelra;
 	
@@ -171,10 +112,44 @@ void getEyeCorners(Mat &face_frame, Rect eye){
 	eye_scelra = hsvChannels[1];
 
 	//threshold
-	threshold(eye_scelra, eye_scelra, 70, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
+	threshold(eye_scelra, eye_scelra, 80, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
 
-	//TODO: calculate center of mass
-	imshow("cam", eye_scelra);
+	//erode to get rid of noise points
+	Mat eroder = getStructuringElement( MORPH_CROSS,
+		Size(3, 3),
+		Point(1, 1)
+	);
+	erode(eye_scelra, eye_scelra, eroder);
+
+	//calc min/max x and associated y's
+	Point max = Point(0,0);
+	Point min = Point(eye_scelra.cols, 0);
+	for (int y = 0; y < eye_scelra.rows; ++y)
+	{
+		uchar* row = eye_scelra.ptr<uchar>(y);
+		for (int x = 0; x < eye_scelra.cols; ++x)
+		{
+			if(row[x] > 0){
+				if (x < min.x)
+				{
+					min = Point(x, y);
+				}
+				if (x > max.x)
+				{
+					max = Point(x, y);
+				}
+			}
+		}
+	}
+	//adjust for crop
+	min.y += crop;
+	max.y += crop;
+	if(max_p != NULL){
+		*max_p = max;
+	}
+	if(min_p != NULL){
+		*min_p = min;
+	}
 }
 
 //get position of pupils
@@ -202,43 +177,13 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 		eye_region_height
 	);
 
-	//-- Find Eye Centers
-	Point left_pupil = Point(0,0);
+	//get center / eye corner
+	Point left_pupil, left_corner;
 	left_pupil = getEyeCenter(face_frame, left_eye_box);
-	getEyeCorners(face_frame_color, left_eye_box);
-	// Point right_pupil = getEyeCenter(face_frame, right_eye_box);
-	// right_pupil.x += right_eye_box.x;
-	// right_pupil.y += right_eye_box.y;
-	// left_pupil.x += left_eye_box.x;
-	// left_pupil.y += left_eye_box.y;
-	// // draw eye centers
-	// circle(face_frame, right_pupil, 3, 1234);
-	// circle(face_frame, left_pupil, 3, 1234);
+	getEyeCorners(face_frame_color, left_eye_box, &left_corner, NULL);
 
-	// //-- Find Eye Corners
-	// if (kEnableEyeCorner) {
-	// 	Point2f leftRightCorner = findEyeCorner(face_frame(leftRightCornerRegion), true, false);
-	// 	leftRightCorner.x += leftRightCornerRegion.x;
-	// 	leftRightCorner.y += leftRightCornerRegion.y;
-	// 	Point2f leftLeftCorner = findEyeCorner(face_frame(leftLeftCornerRegion), true, true);
-	// 	leftLeftCorner.x += leftLeftCornerRegion.x;
-	// 	leftLeftCorner.y += leftLeftCornerRegion.y;
-	// 	Point2f rightLeftCorner = findEyeCorner(face_frame(rightLeftCornerRegion), false, true);
-	// 	rightLeftCorner.x += rightLeftCornerRegion.x;
-	// 	rightLeftCorner.y += rightLeftCornerRegion.y;
-	// 	Point2f rightRightCorner = findEyeCorner(face_frame(rightRightCornerRegion), false, false);
-	// 	rightRightCorner.x += rightRightCornerRegion.x;
-	// 	rightRightCorner.y += rightRightCornerRegion.y;
-	// 	circle(face_frame, leftRightCorner, 3, 200);
-	// 	circle(face_frame, leftLeftCorner, 3, 200);
-	// 	circle(face_frame, rightLeftCorner, 3, 200);
-	// 	circle(face_frame, rightRightCorner, 3, 200);
-	// }
-
-	//imshow("cam", face_frame);
-	//  Rect roi( Point( 0, 0 ), face_frame.size());
-	//  Mat destinationROI = debugImage( roi );
-	//  face_frame.copyTo( destinationROI );
+	Point left_vec = left_corner - left_pupil;
+	printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
 }
 
 //returns a matrix with the gradient in the x direction
