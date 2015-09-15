@@ -2,6 +2,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
+#include <math.h>
 
 using namespace cv;
 using namespace std;
@@ -16,8 +17,9 @@ CascadeClassifier face_cascade;
 #define EYE_HEIGHT 		0.30
 #define EYE_WIDTH 		0.35
 #define EYE_RESIZE_WIDTH	50	//size to resize eye box for speed
-#define EYE_GRADIENT_THRESH	25.0
-#define EYE_BLUR_SIZE	5
+#define EYE_GRADIENT_THRESH	0.3
+#define EYE_SCELRA_THRESH	30
+#define EYE_BLUR_SIZE	3
 
 void getGazePosition(Mat &frame);
 Mat toHueScale(Mat img);
@@ -72,14 +74,14 @@ Mat toHueScale(Mat img){
 	rgb_mat.push_back(Mat::zeros(img.rows, img.cols, CV_64F));
 	for (int i = 0; i < img.rows; ++i)
 	{
-		uchar* img_p = img.ptr<uchar>(i);
-		uchar* r_mat = rgb_mat[0].ptr<uchar>(i);
-		uchar* g_mat = rgb_mat[1].ptr<uchar>(i);
-		uchar* b_mat = rgb_mat[2].ptr<uchar>(i);
+		double* img_p = img.ptr<double>(i);
+		double* r_mat = rgb_mat[2].ptr<double>(i);
+		double* g_mat = rgb_mat[1].ptr<double>(i);
+		double* b_mat = rgb_mat[0].ptr<double>(i);
 		for (int j = 0; j < img.cols; ++j)
 		{
 			//Turn brightness into hue
-			h = 360.0 * img_p[j]/255.0;
+			h = 360.0 * img_p[j];
 			//convert to RGB
 			h /= 60.0;
 			long k = (long)h;
@@ -87,40 +89,39 @@ Mat toHueScale(Mat img){
 			p = v * (1.0 - s);
 			q = v * (1.0 - (s * ff));
 			t = v * (1.0 - (s * (1.0 - ff)));
-			r_mat[j] = (double)img_p[j];
-			// switch(i) {
-			// case 0:
-			// 	r_mat[j] = v;
-			// 	g_mat[j] = t;
-			// 	b_mat[j] = p;
-			// break;
-			// case 1:
-			// 	r_mat[j] = q;
-			// 	g_mat[j] = v;
-			// 	b_mat[j] = p;
-			// break;
-			// case 2:
-			// 	r_mat[j] = p;
-			// 	g_mat[j] = v;
-			// 	b_mat[j] = t;
-			// break;
-			// case 3:
-			// 	r_mat[j] = p;
-			// 	g_mat[j] = q;
-			// 	b_mat[j] = v;
-			// break;
-			// case 4:
-			// 	r_mat[j] = t;
-			// 	g_mat[j] = p;
-			// 	b_mat[j] = v;
-			// break;
-			// case 5:
-			// default:
-			// 	r_mat[j] = v;
-			// 	g_mat[j] = p;
-			// 	b_mat[j] = q;
-			// break;
-			// }
+			switch(k) {
+			case 0:
+				r_mat[j] = v;
+				g_mat[j] = t;
+				b_mat[j] = p;
+			break;
+			case 1:
+				r_mat[j] = q;
+				g_mat[j] = v;
+				b_mat[j] = p;
+			break;
+			case 2:
+				r_mat[j] = p;
+				g_mat[j] = v;
+				b_mat[j] = t;
+			break;
+			case 3:
+				r_mat[j] = p;
+				g_mat[j] = q;
+				b_mat[j] = v;
+			break;
+			case 4:
+				r_mat[j] = t;
+				g_mat[j] = p;
+				b_mat[j] = v;
+			break;
+			case 5:
+			default:
+				r_mat[j] = v;
+				g_mat[j] = p;
+				b_mat[j] = q;
+			break;
+			}
 		}
 	}
 	Mat color;
@@ -128,7 +129,8 @@ Mat toHueScale(Mat img){
 	return color;
 }
 
-void getEyeVectors(Mat &frame_gray, Rect face);
+void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face);
+void getEyeCorners(Mat &face, Rect eye);
 Point getEyeCenter(Mat &face, Rect eye);
 
 //returns a 2D vector of where the eyes are pointing
@@ -151,14 +153,34 @@ void getGazePosition(Mat &frame){
 
 	//find eyes in the first (hopefully only) face
 	if (faces.size() > 0) {
-		getEyeVectors(frame_gray, faces[0]);
+		getEyeVectors(frame, frame_gray, faces[0]);
 	}
 
 	//imshow("cam", frame);
 }
 
-void getEyeVectors(Mat &frame_gray, Rect face) {
+//get positions of corners of eye
+void getEyeCorners(Mat &face_frame, Rect eye){
+	Mat eye_color = face_frame(eye);
+	Mat eye_scelra;
+	
+	//convert to HSV and get saturation channel
+	cvtColor(eye_color, eye_scelra, CV_RGB2HSV);
+	std::vector<Mat> hsvChannels(3);
+	split(eye_scelra, hsvChannels);
+	eye_scelra = hsvChannels[1];
+
+	//threshold
+	threshold(eye_scelra, eye_scelra, 70, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
+
+	//TODO: calculate center of mass
+	imshow("cam", eye_scelra);
+}
+
+//get position of pupils
+void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	Mat face_frame = frame_gray(face);
+	Mat face_frame_color = frame(face);
 
 	//blur to remove some noise
 	GaussianBlur(face_frame, face_frame, Size( 0, 0 ), FACE_SMOOTH * face.width);
@@ -181,7 +203,9 @@ void getEyeVectors(Mat &frame_gray, Rect face) {
 	);
 
 	//-- Find Eye Centers
-	Point left_pupil = getEyeCenter(face_frame, left_eye_box);
+	Point left_pupil = Point(0,0);
+	left_pupil = getEyeCenter(face_frame, left_eye_box);
+	getEyeCorners(face_frame_color, left_eye_box);
 	// Point right_pupil = getEyeCenter(face_frame, right_eye_box);
 	// right_pupil.x += right_eye_box.x;
 	// right_pupil.y += right_eye_box.y;
@@ -223,11 +247,11 @@ Mat computeGradient(const Mat &mat){
 	for (int y = 0; y < mat.rows; ++y) {
 		const uchar *Mr = mat.ptr<uchar>(y);
 		double *Or = out.ptr<double>(y);		
-		Or[0] = Mr[1] - Mr[0];
+		Or[0] = (Mr[1] - Mr[0])*2.0;
 		for (int x = 1; x < mat.cols - 1; ++x) {
 			Or[x] = (Mr[x+1] - Mr[x-1]);
 		}
-		Or[mat.cols-1] = Mr[mat.cols-1] - Mr[mat.cols-2];
+		Or[mat.cols-1] = (Mr[mat.cols-1] - Mr[mat.cols-2])*2.0;
 	}
 	return out/2.0;
 }
@@ -270,9 +294,10 @@ Point getEyeCenter(Mat &face, Rect eye){
 	Scalar stdMagnGrad, meanMagnGrad;
 	meanStdDev(mags, meanMagnGrad, stdMagnGrad);
 	double stdDev = stdMagnGrad[0] / sqrt(mags.rows*mags.cols);
-	double gradientThresh = EYE_GRADIENT_THRESH * stdDev + meanMagnGrad[0];
-	
+	double gradientThresh = -8.0 * stdDev + meanMagnGrad[0];
+
 	//normalize and threshold
+	Point maxStart = Point(0,0), maxEnd = Point(0,0);		//points indicating start/end of thresholded zone
 	for (int y = 0; y < eye_box.rows; ++y) {
 		double *Xr = gradientX.ptr<double>(y), *Yr = gradientY.ptr<double>(y);
 		double *Mr = mags.ptr<double>(y);
@@ -282,6 +307,14 @@ Point getEyeCenter(Mat &face, Rect eye){
 			if (magnitude > gradientThresh) {
 				Xr[x] = gX/magnitude;
 				Yr[x] = gY/magnitude;
+				if(x > 10 && maxStart.x == 0 && maxStart.y == 0){
+					maxStart.x = x;
+					maxStart.y = y;
+				}
+				if(x < eye_box.rows - 10){
+					maxEnd.x = x;
+					maxEnd.y = y;
+				}
 			} else {
 				Xr[x] = 0.0;
 				Yr[x] = 0.0;
@@ -289,6 +322,9 @@ Point getEyeCenter(Mat &face, Rect eye){
 			}
 		}
 	}
+
+	//printf("start: %d, %d, end: %d, %d\n", maxStart.x, maxStart.y, maxEnd.x, maxEnd.y);
+	//imshow("cam", gradientX);
 
 	//-- Create a blurred and inverted image for weighting
 	Mat weight;
@@ -299,7 +335,7 @@ Point getEyeCenter(Mat &face, Rect eye){
 			row[x] = (255 - row[x]);
 		}
 	}
-	imshow("cam", toHueScale(weight));
+	//imshow("cam", weight);
 	//-- Run the algorithm!
 	Mat outSum = Mat::zeros(eye_box.rows,eye_box.cols,CV_64F);
 	// for each possible gradient location
@@ -345,5 +381,6 @@ Point getEyeCenter(Mat &face, Rect eye){
 	double maxVal;
 	minMaxLoc(out, NULL,&maxVal,NULL,&maxP);
 	circle(eye_box, maxP, 3, 200);
-	// return maxP;
+	//imshow("cam", eye_box);
+	return maxP;
 }
