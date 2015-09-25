@@ -52,8 +52,8 @@ int main() {
 }
 
 void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face);
-void getEyeCorners(Mat &face_frame, Rect eye, Point *max_p, Point *min_p);
-Point getEyeCenter(Mat &face, Rect eye);
+Point getEyeCenter(Mat &face_frame, Rect eye);
+Point getPupilCenter(Mat &face, Rect eye);
 
 //returns a 2D vector of where the eyes are pointing
 void getGazePosition(Mat &frame){
@@ -108,35 +108,30 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	);
 
 	//get left center / eye corner
-	Point left_pupil, left_corner_max, left_corner_min;
-	left_pupil = getEyeCenter(face_frame, left_eye_box);
-	getEyeCorners(face_frame_color, left_eye_box, &left_corner_max, &left_corner_min);
+	Point left_pupil, left_center;
+	left_pupil = getPupilCenter(face_frame, left_eye_box);
+	left_center = getEyeCenter(face_frame_color, left_eye_box);
 	//fix offset
-	left_corner_min.x += eye_region_side;
-	left_corner_min.y += eye_region_top;
-	left_corner_max.x += eye_region_side;
-	left_corner_max.y += eye_region_top;
+	left_pupil.x 	  += eye_region_side;
+	left_pupil.y 	  += eye_region_top;
+	left_center.x += eye_region_side;
+	left_center.y += eye_region_top;
 
 	//get right center / eye corner
-	Point right_pupil, right_corner_max, right_corner_min;
-	//right_pupil = getEyeCenter(face_frame, right_eye_box);
-	getEyeCorners(face_frame_color, right_eye_box, &right_corner_max, &right_corner_min);
+	Point right_pupil, right_center;
+	right_pupil = getPupilCenter(face_frame, right_eye_box);
+	//right_center = getEyeCenter(face_frame_color, right_eye_box);
 	//fix offset
-	right_corner_min.x += face.width - eye_region_width - eye_region_side;
-	right_corner_min.y += eye_region_top;
-	right_corner_max.x += face.width - eye_region_width - eye_region_side;
-	right_corner_max.y += eye_region_top;
+	right_pupil.x 	   += face.width - eye_region_width - eye_region_side;
+	right_pupil.y 	   += eye_region_top;
+	right_center.x += face.width - eye_region_width - eye_region_side;
+	right_center.y += eye_region_top;
 
-	//TODO: somehow take into account the fact that looking right with
-	//your left eye causes the scelra detection to fail and vice versa
-	//with the right eye. Use somekind of confidence weight, and/or alternate
-	//which center's y is used primarily, and add some jitter handling.
-
-	circle(face_frame, left_corner_min, 3, 0);
-	circle(face_frame, right_corner_min, 3, 0);
-	circle(face_frame, left_corner_max, 3, 0);
-	circle(face_frame, right_corner_max, 3, 0);
-	//imshow("cam", face_frame);
+	//circle(face_frame, left_pupil, 3, 200);
+	//circle(face_frame, right_pupil, 3, 200);
+	circle(face_frame, left_center, 3, 200);
+	circle(face_frame, right_center, 3, 200);
+	imshow("cam", face_frame);
 
 	//Point left_vec = left_corner - left_pupil;
 	//printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
@@ -172,7 +167,7 @@ Mat matrixMagnitude(Mat &matX, Mat &matY) {
 	return mags;
 }
 
-Point getEyeCenter(Mat &face, Rect eye){
+Point getPupilCenter(Mat &face, Rect eye){
 	Mat eye_box = face(eye);
 	
 	//scale down for speed
@@ -281,17 +276,18 @@ Point getEyeCenter(Mat &face, Rect eye){
 	Point maxP;
 	double maxVal;
 	minMaxLoc(out, NULL,&maxVal,NULL,&maxP);
-	circle(out, maxP, 3, 200);
-	imshow("cam", out/40);
+	//circle(eye_box, maxP, 3, 200);
+	//imshow("cam", eye_box);
 	return maxP;
 }
 
 //get positions of corners of eye
-void getEyeCorners(Mat &face_frame, Rect eye, Point *max_p, Point *min_p){
+Point getEyeCenter(Mat &face_frame, Rect eye){
 	//crop eye to get rid of some noise
-	int crop = 10;
-	eye.y += crop;
-	eye.height -= crop * 2;
+	int crop_y = 10;
+	eye.y += crop_y;
+	eye.height -= crop_y * 2;
+	eye.width -= 20;
 	
 	Mat eye_color = face_frame(eye);
 	Mat eye_scelra;
@@ -300,43 +296,39 @@ void getEyeCorners(Mat &face_frame, Rect eye, Point *max_p, Point *min_p){
 	cvtColor(eye_color, eye_scelra, CV_RGB2HSV);
 	std::vector<Mat> hsvChannels(3);
 	split(eye_scelra, hsvChannels);
-	eye_scelra = hsvChannels[1];
+	eye_scelra = hsvChannels[1].mul(hsvChannels[2]) / 40;
+
+	//invert
+	bitwise_not(eye_scelra, eye_scelra);
+
+	//blur
+	blur(eye_scelra, eye_scelra, Size(4,4));
+
+	//apply histogram equalization
+	//equalizeHist(eye_scelra, eye_scelra);
 
 	//threshold
-	threshold(eye_scelra, eye_scelra, 70, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
+	//threshold(eye_scelra, eye_scelra, 10, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
 
-	//TODO: possibly find pixel groups by clustering
-	//and remove the smaller ones
-
-	//calc min/max x and associated y's
-	Point max = Point(0,0);
-	Point min = Point(eye_scelra.cols, 0);
+	//calc center of mass
+	double sum = 0;
+	double sum_x = 0;
+	double sum_y = 0;
 	for (int y = 0; y < eye_scelra.rows; ++y)
 	{
 		uchar* row = eye_scelra.ptr<uchar>(y);
 		for (int x = 0; x < eye_scelra.cols; ++x)
 		{
-			if(row[x] > 0){
-				if (x < min.x)
-				{
-					min = Point(x, y);
-				}
-				if (x > max.x)
-				{
-					max = Point(x, y);
-				}
-			}
+			sum += row[x];
+			sum_x += row[x]*x;
+			sum_y += row[x]*y;
 		}
 	}
-	// circle(eye_scelra, min, 3, 200);
-	//imshow("cam", eye_scelra);
+	Point max = Point(sum_x/sum, sum_y/sum);
+
+	circle(eye_scelra, max, 3, 0);
+	imshow("eye", eye_scelra);
 	//adjust for crop
-	min.y += crop;
-	max.y += crop;
-	if(max_p != NULL){
-		*max_p = max;
-	}
-	if(min_p != NULL){
-		*min_p = min;
-	}
+	max.y += crop_y;
+	return max;
 }
