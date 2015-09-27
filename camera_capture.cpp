@@ -112,26 +112,26 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	left_pupil = getPupilCenter(face_frame, left_eye_box);
 	left_center = getEyeCenter(face_frame_color, left_eye_box);
 	//fix offset
-	left_pupil.x 	  += eye_region_side;
-	left_pupil.y 	  += eye_region_top;
+	left_pupil.x  += eye_region_side;
+	left_pupil.y  += eye_region_top;
 	left_center.x += eye_region_side;
 	left_center.y += eye_region_top;
 
 	//get right center / eye corner
 	Point right_pupil, right_center;
 	right_pupil = getPupilCenter(face_frame, right_eye_box);
-	//right_center = getEyeCenter(face_frame_color, right_eye_box);
+	right_center = getEyeCenter(face_frame_color, right_eye_box);
 	//fix offset
-	right_pupil.x 	   += face.width - eye_region_width - eye_region_side;
-	right_pupil.y 	   += eye_region_top;
+	right_pupil.x  += face.width - eye_region_width - eye_region_side;
+	right_pupil.y  += eye_region_top;
 	right_center.x += face.width - eye_region_width - eye_region_side;
 	right_center.y += eye_region_top;
 
-	//circle(face_frame, left_pupil, 3, 200);
-	//circle(face_frame, right_pupil, 3, 200);
+	circle(face_frame, left_pupil, 3, 200);
+	circle(face_frame, right_pupil, 3, 200);
 	circle(face_frame, left_center, 3, 200);
 	circle(face_frame, right_center, 3, 200);
-	imshow("cam", face_frame);
+	//imshow("cam", face_frame);
 
 	//Point left_vec = left_corner - left_pupil;
 	//printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
@@ -220,20 +220,15 @@ Point getPupilCenter(Mat &face, Rect eye){
 	}
 
 	//printf("start: %d, %d, end: %d, %d\n", maxStart.x, maxStart.y, maxEnd.x, maxEnd.y);
-	//imshow("cam", gradientX);
+	//imshow("cam", gradientY);
 
-	//-- Create a blurred and inverted image for weighting
+	//create a blurred and inverted image for weighting
 	Mat weight;
-	GaussianBlur(eye_box, weight, Size(EYE_BLUR_SIZE, EYE_BLUR_SIZE), 0, 0);
-	for (int y = 0; y < weight.rows; ++y) {
-		unsigned char *row = weight.ptr<unsigned char>(y);
-		for (int x = 0; x < weight.cols; ++x) {
-			row[x] = (255 - row[x]);
-		}
-	}
-	//imshow("cam", weight);
-	//-- Run the algorithm!
-	Mat outSum = Mat::zeros(eye_box.rows,eye_box.cols,CV_64F);
+	bitwise_not(eye_box, weight);
+	blur(weight, weight, Size(2,2));
+	//run the algorithm
+	Mat out = Mat::zeros(weight.rows,weight.cols, CV_64F);
+	double max_val = 0;
 	// for each possible gradient location
 	// Note: these loops are reversed from the way the paper does them
 	// it evaluates every possible center for each gradient location instead of
@@ -246,10 +241,10 @@ Point getPupilCenter(Mat &face, Rect eye){
 				continue;
 			}
 			// for all possible centers
-			for (int cy = 0; cy < outSum.rows; ++cy) {
-				double *Or = outSum.ptr<double>(cy);
-				const unsigned char *Wr = weight.ptr<unsigned char>(cy);
-				for (int cx = 0; cx < outSum.cols; ++cx) {
+			for (int cy = 0; cy < out.rows; ++cy) {
+				double *Or = out.ptr<double>(cy);
+				const uchar *Wr = weight.ptr<uchar>(cy);
+				for (int cx = 0; cx < out.cols; ++cx) {
 					if (x == cx && y == cy) {
 						continue;
 					}
@@ -258,27 +253,41 @@ Point getPupilCenter(Mat &face, Rect eye){
 					double dy = y - cy;
 					// normalize d
 					double magnitude = sqrt((dx * dx) + (dy * dy));
-					dx = dx / magnitude;
-					dy = dy / magnitude;
+					dx /= magnitude;
+					dy /= magnitude;
 					double dotProduct = dx*gY + dy*gY;
 					dotProduct = std::max(0.0,dotProduct);
 					// square and multiply by the weight
 					Or[cx] += dotProduct * dotProduct * (Wr[cx]/1.0);
+					if(Or[cx] > max_val){
+						max_val = Or[cx];
+					}
 				}
 			}
 		}
 	}
-	// scale all the values down, basically averaging them
+	//scale down image
 	double numGradients = (weight.rows*weight.cols);
-	Mat out;
-	outSum.convertTo(out, CV_32F, 1.0/numGradients);
-	//-- Find the maximum point
-	Point maxP;
-	double maxVal;
-	minMaxLoc(out, NULL,&maxVal,NULL,&maxP);
-	//circle(eye_box, maxP, 3, 200);
-	//imshow("cam", eye_box);
-	return maxP;
+	numGradients *= numGradients;
+	//threshold(out, out, max_val)
+	//calc center of mass
+	double sum = 0;
+	double sum_x = 0;
+	double sum_y = 0;
+	for (int y = 0; y < out.rows; ++y)
+	{
+		double* row = out.ptr<double>(y);
+		for (int x = 0; x < out.cols; ++x)
+		{
+			sum += row[x];
+			sum_x += row[x]*x;
+			sum_y += row[x]*y;
+		}
+	}
+	Point max = Point(sum_x/sum, sum_y/sum);
+	circle(out, max, 3, 0);
+	imshow("cam", out / 200000);
+	return max;
 }
 
 //get positions of corners of eye
@@ -287,7 +296,7 @@ Point getEyeCenter(Mat &face_frame, Rect eye){
 	int crop_y = 10;
 	eye.y += crop_y;
 	eye.height -= crop_y * 2;
-	eye.width -= 20;
+	//eye.width -= 20;
 	
 	Mat eye_color = face_frame(eye);
 	Mat eye_scelra;
@@ -296,7 +305,7 @@ Point getEyeCenter(Mat &face_frame, Rect eye){
 	cvtColor(eye_color, eye_scelra, CV_RGB2HSV);
 	std::vector<Mat> hsvChannels(3);
 	split(eye_scelra, hsvChannels);
-	eye_scelra = hsvChannels[1].mul(hsvChannels[2]) / 40;
+	eye_scelra = hsvChannels[1].mul(hsvChannels[2]) / 30;
 
 	//invert
 	bitwise_not(eye_scelra, eye_scelra);
@@ -305,7 +314,7 @@ Point getEyeCenter(Mat &face_frame, Rect eye){
 	blur(eye_scelra, eye_scelra, Size(4,4));
 
 	//apply histogram equalization
-	//equalizeHist(eye_scelra, eye_scelra);
+	equalizeHist(eye_scelra, eye_scelra);
 
 	//threshold
 	//threshold(eye_scelra, eye_scelra, 10, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
@@ -327,7 +336,7 @@ Point getEyeCenter(Mat &face_frame, Rect eye){
 	Point max = Point(sum_x/sum, sum_y/sum);
 
 	circle(eye_scelra, max, 3, 0);
-	imshow("eye", eye_scelra);
+	//imshow("eye", eye_scelra);
 	//adjust for crop
 	max.y += crop_y;
 	return max;
