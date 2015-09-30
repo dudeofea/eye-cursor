@@ -131,7 +131,7 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	circle(face_frame, right_pupil, 3, 200);
 	circle(face_frame, left_center, 3, 200);
 	circle(face_frame, right_center, 3, 200);
-	//imshow("cam", face_frame);
+	imshow("cam", face_frame);
 
 	//Point left_vec = left_corner - left_pupil;
 	//printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
@@ -233,18 +233,18 @@ Point getPupilCenter(Mat &face, Rect eye){
 					float dy = y - cy;
 
 					//normalize d
-					float magnitude = sqrt((dx * dx) + (dy * dy));
-					dx /= magnitude;
-					dy /= magnitude;
+					float magnitude = (dx * dx) + (dy * dy);
+					dx = dx / magnitude;
+					dy = dy / magnitude;
 					float dotProduct = dx*gY + dy*gY;
 
 					//ignore negative dot products as they point away from eye
-					if(dotProduct < 0.0){
+					if(dotProduct <= 0.0){
 						dotProduct = 0.0;
 					}
 
 					//square and multiply by the weight
-					Or[cx] += dotProduct * dotProduct * (Wr[cx]/1.0);
+					Or[cx] += dotProduct * Wr[cx];
 
 					//compare with max
 					if(Or[cx] > max_val){
@@ -255,35 +255,30 @@ Point getPupilCenter(Mat &face, Rect eye){
 		}
 	}
 
-	imshow("cam", out * 10000000);
+	//threshold to get just the pupil
+	threshold(out, out, 0.6 * max_val, max_val, THRESH_TOZERO);
 
-	// double numGradients = (weight.rows*weight.cols);
-	// numGradients *= numGradients;
-	// //threshold(out, out, max_val)
-	// //calc center of mass
-	// double sum = 0;
-	// double sum_x = 0;
-	// double sum_y = 0;
-	// for (int y = 0; y < out.rows; ++y)
-	// {
-	// 	double* row = out.ptr<double>(y);
-	// 	for (int x = 0; x < out.cols; ++x)
-	// 	{
-	// 		if (row[x] > max_val - 2000)
-	// 		{
-	// 			sum += row[x];
-	// 			sum_x += row[x]*x;
-	// 			sum_y += row[x]*y;
-	// 		}else{
-	// 			row[x] = 0;
-	// 		}
-	// 	}
-	// }
-	// Point max = Point(sum_x/sum, sum_y/sum);
-	// circle(out, max, 3, 0);
-	// //imshow("cam", out / 200000);
-	// return max;
-	return Point(0,0);
+	//calc center of mass
+	float sum = 0;
+	float sum_x = 0;
+	float sum_y = 0;
+	for (int y = 0; y < out.rows; ++y)
+	{
+		float* row = out.ptr<float>(y);
+		for (int x = 0; x < out.cols; ++x)
+		{
+			float val = row[x];
+			if(val > 0){
+				sum += val;
+				sum_x += val*x;
+				sum_y += val*y;
+			}
+		}
+	}
+	Point max = Point(sum_x/sum, sum_y/sum);
+	circle(out, max, 3, 0);
+	//imshow("cam", out / max_val);
+	return max;
 }
 
 //get positions of corners of eye
