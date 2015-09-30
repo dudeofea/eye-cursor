@@ -139,28 +139,28 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 
 //returns a matrix with the gradient in the x direction
 Mat computeGradient(const Mat &mat){
-	Mat out(mat.rows,mat.cols,CV_64F);
+	Mat out(mat.rows,mat.cols, CV_32S);
 	for (int y = 0; y < mat.rows; ++y) {
 		const uchar *Mr = mat.ptr<uchar>(y);
-		double *Or = out.ptr<double>(y);		
+		int *Or = out.ptr<int>(y);
 		Or[0] = (Mr[1] - Mr[0])*2.0;
 		for (int x = 1; x < mat.cols - 1; ++x) {
 			Or[x] = (Mr[x+1] - Mr[x-1]);
 		}
 		Or[mat.cols-1] = (Mr[mat.cols-1] - Mr[mat.cols-2])*2.0;
 	}
-	return out/2.0;
+	return out;
 }
 
 //returns a matrix of magnitudes given a matrix of x and y values
 Mat matrixMagnitude(Mat &matX, Mat &matY) {
-	Mat mags(matX.rows,matX.cols,CV_64F);
+	Mat mags(matX.rows,matX.cols,CV_32F);
 	for (int y = 0; y < matX.rows; ++y) {
-		const double *Xr = matX.ptr<double>(y), *Yr = matY.ptr<double>(y);
-		double *Mr = mags.ptr<double>(y);
+		const int *grad_x = matX.ptr<int>(y), *grad_y = matY.ptr<int>(y);
+		float *Mr = mags.ptr<float>(y);
 		for (int x = 0; x < matX.cols; ++x) {
-			double gX = Xr[x], gY = Yr[x];
-			double magnitude = sqrt((gX * gX) + (gY * gY));
+			int gX = grad_x[x], gY = grad_y[x];
+			float magnitude = sqrt((gX * gX) + (gY * gY));
 			Mr[x] = magnitude;
 		}
 	}
@@ -170,13 +170,7 @@ Mat matrixMagnitude(Mat &matX, Mat &matY) {
 Point getPupilCenter(Mat &face, Rect eye){
 	Mat eye_box = face(eye);
 	
-	//scale down for speed
-	/*resize(
-		eye_box, eye_box, 
-		Size(EYE_RESIZE_WIDTH, EYE_RESIZE_WIDTH/eye_box.cols) * eye_box.rows
-	);*/
-	
-	// draw eye region
+	//crop eye region
 	rectangle(face, eye, 1234);
 	
 	//find x and y gradients
@@ -186,79 +180,73 @@ Point getPupilCenter(Mat &face, Rect eye){
 	//normalize and threshold the gradient
 	Mat mags = matrixMagnitude(gradientX, gradientY);
 
-	//compute the threshold
-	Scalar stdMagnGrad, meanMagnGrad;
-	meanStdDev(mags, meanMagnGrad, stdMagnGrad);
-	double stdDev = stdMagnGrad[0] / sqrt(mags.rows*mags.cols);
-	double gradientThresh = -8.0 * stdDev + meanMagnGrad[0];
-
-	//normalize and threshold
-	Point maxStart = Point(0,0), maxEnd = Point(0,0);		//points indicating start/end of thresholded zone
-	for (int y = 0; y < eye_box.rows; ++y) {
-		double *Xr = gradientX.ptr<double>(y), *Yr = gradientY.ptr<double>(y);
-		double *Mr = mags.ptr<double>(y);
-		for (int x = 0; x < eye_box.cols; ++x) {
-			double gX = Xr[x], gY = Yr[x];
-			double magnitude = Mr[x];
-			if (magnitude > gradientThresh) {
-				Xr[x] = gX/magnitude;
-				Yr[x] = gY/magnitude;
-				if(x > 10 && maxStart.x == 0 && maxStart.y == 0){
-					maxStart.x = x;
-					maxStart.y = y;
-				}
-				if(x < eye_box.rows - 10){
-					maxEnd.x = x;
-					maxEnd.y = y;
-				}
-			} else {
-				Xr[x] = 0.0;
-				Yr[x] = 0.0;
-				Mr[x] = 0.0;
-			}
-		}
-	}
-
-	//printf("start: %d, %d, end: %d, %d\n", maxStart.x, maxStart.y, maxEnd.x, maxEnd.y);
-	//imshow("cam", gradientY);
-
 	//create a blurred and inverted image for weighting
 	Mat weight;
 	bitwise_not(eye_box, weight);
 	blur(weight, weight, Size(2,2));
-	//run the algorithm
-	Mat out = Mat::zeros(weight.rows,weight.cols, CV_64F);
-	double max_val = 0;
-	// for each possible gradient location
-	// Note: these loops are reversed from the way the paper does them
-	// it evaluates every possible center for each gradient location instead of
-	// every possible gradient location for every center.
-	for (int y = 0; y < weight.rows; ++y) {
-		const double *Xr = gradientX.ptr<double>(y), *Yr = gradientY.ptr<double>(y);
-		for (int x = 0; x < weight.cols; ++x) {
-			double gX = Xr[x], gY = Yr[x];
-			if (gX == 0.0 && gY == 0.0) {
+
+	//weight the magnitudes, convert to 8-bit for thresholding
+	weight.convertTo(weight, CV_32F);
+	mags = mags.mul(weight);
+	normalize(mags, mags, 0, 1, NORM_MINMAX, CV_32F);
+	mags.convertTo(mags, CV_8UC1, 255);
+
+	//threshold using Otsu's method
+	threshold(mags, mags, 0, 255, THRESH_BINARY | THRESH_OTSU);
+
+	//convert to CV_32S and filter gradients
+	mags.convertTo(mags, CV_32S);
+	gradientY = gradientY.mul(mags);
+	gradientX = gradientX.mul(mags);
+
+	imshow("cam", gradientY);
+
+	//TODO: speed improvements
+	//	- use lookup table of unit vectors (normalized dx and dy)
+	//	- confine search area of center to fixed range (say 20x20 pixels)
+
+	//run the algorithm:
+	//	for each possible gradient location
+	//	Note: these loops are reversed from the way the paper does them
+	//	it evaluates every possible center for each gradient location instead of
+	//	every possible gradient location for every center.
+	Mat out = Mat::zeros(weight.rows,weight.cols, CV_32F);
+	float max_val = 0;
+	//for all pixels in the image
+	for (int y = 0; y < out.rows; ++y) {
+		const int *grad_x = gradientX.ptr<int>(y), *grad_y = gradientY.ptr<int>(y);
+		for (int x = 0; x < out.cols; ++x) {
+			int gX = grad_x[x], gY = grad_y[x];
+			if (gX == 0 && gY == 0) {
 				continue;
 			}
-			// for all possible centers
+			//for all possible centers
 			for (int cy = 0; cy < out.rows; ++cy) {
-				double *Or = out.ptr<double>(cy);
-				const uchar *Wr = weight.ptr<uchar>(cy);
+				float *Or = out.ptr<float>(cy);
+				const float *Wr = weight.ptr<float>(cy);
 				for (int cx = 0; cx < out.cols; ++cx) {
 					if (x == cx && y == cy) {
 						continue;
 					}
-					// create a vector from the possible center to the gradient origin
-					double dx = x - cx;
-					double dy = y - cy;
-					// normalize d
-					double magnitude = sqrt((dx * dx) + (dy * dy));
+					//create a vector from the possible center to the gradient origin
+					float dx = x - cx;
+					float dy = y - cy;
+
+					//normalize d
+					float magnitude = sqrt((dx * dx) + (dy * dy));
 					dx /= magnitude;
 					dy /= magnitude;
-					double dotProduct = dx*gY + dy*gY;
-					dotProduct = std::max(0.0,dotProduct);
-					// square and multiply by the weight
+					float dotProduct = dx*gY + dy*gY;
+
+					//ignore negative dot products as they point away from eye
+					if(dotProduct < 0.0){
+						dotProduct = 0.0;
+					}
+
+					//square and multiply by the weight
 					Or[cx] += dotProduct * dotProduct * (Wr[cx]/1.0);
+
+					//compare with max
 					if(Or[cx] > max_val){
 						max_val = Or[cx];
 					}
@@ -266,28 +254,36 @@ Point getPupilCenter(Mat &face, Rect eye){
 			}
 		}
 	}
-	//scale down image
-	double numGradients = (weight.rows*weight.cols);
-	numGradients *= numGradients;
-	//threshold(out, out, max_val)
-	//calc center of mass
-	double sum = 0;
-	double sum_x = 0;
-	double sum_y = 0;
-	for (int y = 0; y < out.rows; ++y)
-	{
-		double* row = out.ptr<double>(y);
-		for (int x = 0; x < out.cols; ++x)
-		{
-			sum += row[x];
-			sum_x += row[x]*x;
-			sum_y += row[x]*y;
-		}
-	}
-	Point max = Point(sum_x/sum, sum_y/sum);
-	circle(out, max, 3, 0);
-	imshow("cam", out / 200000);
-	return max;
+
+	imshow("cam", out * 10000000);
+
+	// double numGradients = (weight.rows*weight.cols);
+	// numGradients *= numGradients;
+	// //threshold(out, out, max_val)
+	// //calc center of mass
+	// double sum = 0;
+	// double sum_x = 0;
+	// double sum_y = 0;
+	// for (int y = 0; y < out.rows; ++y)
+	// {
+	// 	double* row = out.ptr<double>(y);
+	// 	for (int x = 0; x < out.cols; ++x)
+	// 	{
+	// 		if (row[x] > max_val - 2000)
+	// 		{
+	// 			sum += row[x];
+	// 			sum_x += row[x]*x;
+	// 			sum_y += row[x]*y;
+	// 		}else{
+	// 			row[x] = 0;
+	// 		}
+	// 	}
+	// }
+	// Point max = Point(sum_x/sum, sum_y/sum);
+	// circle(out, max, 3, 0);
+	// //imshow("cam", out / 200000);
+	// return max;
+	return Point(0,0);
 }
 
 //get positions of corners of eye
