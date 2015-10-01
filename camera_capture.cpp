@@ -16,7 +16,7 @@ CascadeClassifier face_cascade;
 #define EYE_SIDE 		0.13
 #define EYE_HEIGHT 		0.30
 #define EYE_WIDTH 		0.35
-#define EYE_RESIZE_WIDTH	50	//size to resize eye box for speed
+#define EYE_FRAME_SIZE	80		//size to resize eye box for speed
 #define EYE_GRADIENT_THRESH	0.3
 #define EYE_SCELRA_THRESH	30
 #define EYE_BLUR_SIZE	3
@@ -132,8 +132,8 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	//circle(face_frame, left_center, 3, 200);
 	//circle(face_frame, right_center, 3, 200);
 	//resize for debugging
-	resize(face_frame, face_frame, Size(500,500), 0, 0, INTER_NEAREST);
-	imshow("cam", face_frame);
+	//resize(face_frame, face_frame, Size(500,500), 0, 0, INTER_NEAREST);
+	//imshow("cam", face_frame);
 
 	//Point left_vec = left_corner - left_pupil;
 	//printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
@@ -205,6 +205,11 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	//	- use lookup table of unit vectors (normalized dx and dy)
 	//	- confine search area of center to fixed range (say 20x20 pixels)
 
+	//resize arrays to same size
+	resize(gradientX, gradientX, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
+	resize(gradientY, gradientY, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
+	resize(weight, weight, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
+
 	//run the algorithm:
 	//	for each possible gradient location
 	//	Note: these loops are reversed from the way the paper does them
@@ -234,10 +239,10 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 					float dy = y - cy;
 
 					//normalize d
-					float magnitude = (dx * dx) + (dy * dy);
-					dx = dx * dx / magnitude;
-					dy = dy * dy / magnitude;
-					float dotProduct = dx*gY + dy*gY;
+					float magnitude = sqrt((dx * dx) + (dy * dy));
+					dx = dx / magnitude;
+					dy = dy / magnitude;
+					float dotProduct = dx*gX + dy*gY;
 
 					//ignore negative dot products as they point away from eye
 					if(dotProduct <= 0.0){
@@ -259,7 +264,7 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	//resize for debugging
 	//resize(out, out, Size(500,500), 0, 0, INTER_NEAREST);
 
-	//imshow("calc", out / max_val);
+	imshow("calc", out / max_val);
 
 	//threshold to get just the pupil
 	threshold(out, out, 0.95 * max_val, max_val, THRESH_TOZERO);
