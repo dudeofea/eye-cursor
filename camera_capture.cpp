@@ -217,20 +217,20 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	//	every possible gradient location for every center.
 	Mat out = Mat::zeros(weight.rows,weight.cols, CV_32F);
 	float max_val = 0;
-	int bound_size = 0;
 	//for all pixels in the image
-	for (int y = bound_size; y < out.rows - bound_size; ++y) {
+	for (int y = 0; y < EYE_FRAME_SIZE; ++y) {
 		const int *grad_x = gradientX.ptr<int>(y), *grad_y = gradientY.ptr<int>(y);
-		for (int x = bound_size; x < out.cols - bound_size; ++x) {
+		for (int x = 0; x < EYE_FRAME_SIZE; ++x) {
 			int gX = grad_x[x], gY = grad_y[x];
 			if (gX == 0 && gY == 0) {
 				continue;
 			}
 			//for all possible centers
-			for (int cy = 0; cy < out.rows; ++cy) {
+			for (int cy = 0; cy < EYE_FRAME_SIZE; ++cy) {
 				float *Or = out.ptr<float>(cy);
 				const float *Wr = weight.ptr<float>(cy);
-				for (int cx = 0; cx < out.cols; ++cx) {
+				for (int cx = 0; cx < EYE_FRAME_SIZE; ++cx) {
+					//ignore center of box
 					if (x == cx && y == cy) {
 						continue;
 					}
@@ -262,7 +262,7 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	}
 
 	//resize for debugging
-	//resize(out, out, Size(500,500), 0, 0, INTER_NEAREST);
+	resize(out, out, Size(500,500), 0, 0, INTER_NEAREST);
 
 	imshow("calc", out / max_val);
 
@@ -288,7 +288,7 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	}
 	CvPoint2D32f max = cvPoint2D32f(sum_x/sum, sum_y/sum);
 	circle(out, max, 3, 0);
-	//imshow("thresh", out / max_val);
+	imshow("thresh", out / max_val);
 	return max;
 }
 
