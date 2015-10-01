@@ -52,8 +52,8 @@ int main() {
 }
 
 void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face);
-Point getEyeCenter(Mat &face_frame, Rect eye);
-Point getPupilCenter(Mat &face, Rect eye);
+CvPoint2D32f getEyeCenter(Mat &face_frame, Rect eye);
+CvPoint2D32f getPupilCenter(Mat &face, Rect eye);
 
 //returns a 2D vector of where the eyes are pointing
 void getGazePosition(Mat &frame){
@@ -108,7 +108,7 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	);
 
 	//get left center / eye corner
-	Point left_pupil, left_center;
+	CvPoint2D32f left_pupil, left_center;
 	left_pupil = getPupilCenter(face_frame, left_eye_box);
 	left_center = getEyeCenter(face_frame_color, left_eye_box);
 	//fix offset
@@ -118,7 +118,7 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	left_center.y += eye_region_top;
 
 	//get right center / eye corner
-	Point right_pupil, right_center;
+	CvPoint2D32f right_pupil, right_center;
 	right_pupil = getPupilCenter(face_frame, right_eye_box);
 	right_center = getEyeCenter(face_frame_color, right_eye_box);
 	//fix offset
@@ -127,10 +127,12 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	right_center.x += face.width - eye_region_width - eye_region_side;
 	right_center.y += eye_region_top;
 
-	circle(face_frame, left_pupil, 3, 200);
-	circle(face_frame, right_pupil, 3, 200);
-	circle(face_frame, left_center, 3, 200);
-	circle(face_frame, right_center, 3, 200);
+	circle(face_frame, left_pupil, 2, 200);
+	circle(face_frame, right_pupil, 2, 200);
+	//circle(face_frame, left_center, 3, 200);
+	//circle(face_frame, right_center, 3, 200);
+	//resize for debugging
+	resize(face_frame, face_frame, Size(500,500), 0, 0, INTER_NEAREST);
 	imshow("cam", face_frame);
 
 	//Point left_vec = left_corner - left_pupil;
@@ -167,16 +169,13 @@ Mat matrixMagnitude(Mat &matX, Mat &matY) {
 	return mags;
 }
 
-Point getPupilCenter(Mat &face, Rect eye){
+CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	Mat eye_box = face(eye);
-	
-	//crop eye region
-	rectangle(face, eye, 1234);
-	
+
 	//find x and y gradients
 	Mat gradientX = computeGradient(eye_box);
 	Mat gradientY = computeGradient(eye_box.t()).t();
-	
+
 	//normalize and threshold the gradient
 	Mat mags = matrixMagnitude(gradientX, gradientY);
 
@@ -199,7 +198,8 @@ Point getPupilCenter(Mat &face, Rect eye){
 	gradientY = gradientY.mul(mags);
 	gradientX = gradientX.mul(mags);
 
-	imshow("cam", gradientY);
+	//imshow("gradY", gradientY * 255);
+	//imshow("gradX", gradientX * 255);
 
 	//TODO: speed improvements
 	//	- use lookup table of unit vectors (normalized dx and dy)
@@ -212,10 +212,11 @@ Point getPupilCenter(Mat &face, Rect eye){
 	//	every possible gradient location for every center.
 	Mat out = Mat::zeros(weight.rows,weight.cols, CV_32F);
 	float max_val = 0;
+	int bound_size = 0;
 	//for all pixels in the image
-	for (int y = 0; y < out.rows; ++y) {
+	for (int y = bound_size; y < out.rows - bound_size; ++y) {
 		const int *grad_x = gradientX.ptr<int>(y), *grad_y = gradientY.ptr<int>(y);
-		for (int x = 0; x < out.cols; ++x) {
+		for (int x = bound_size; x < out.cols - bound_size; ++x) {
 			int gX = grad_x[x], gY = grad_y[x];
 			if (gX == 0 && gY == 0) {
 				continue;
@@ -234,17 +235,17 @@ Point getPupilCenter(Mat &face, Rect eye){
 
 					//normalize d
 					float magnitude = (dx * dx) + (dy * dy);
-					dx = dx / magnitude;
-					dy = dy / magnitude;
+					dx = dx * dx / magnitude;
+					dy = dy * dy / magnitude;
 					float dotProduct = dx*gY + dy*gY;
 
 					//ignore negative dot products as they point away from eye
 					if(dotProduct <= 0.0){
-						dotProduct = 0.0;
+						continue;
 					}
 
 					//square and multiply by the weight
-					Or[cx] += dotProduct * Wr[cx];
+					Or[cx] += dotProduct * dotProduct * Wr[cx];
 
 					//compare with max
 					if(Or[cx] > max_val){
@@ -255,8 +256,13 @@ Point getPupilCenter(Mat &face, Rect eye){
 		}
 	}
 
+	//resize for debugging
+	//resize(out, out, Size(500,500), 0, 0, INTER_NEAREST);
+
+	//imshow("calc", out / max_val);
+
 	//threshold to get just the pupil
-	threshold(out, out, 0.6 * max_val, max_val, THRESH_TOZERO);
+	threshold(out, out, 0.95 * max_val, max_val, THRESH_TOZERO);
 
 	//calc center of mass
 	float sum = 0;
@@ -267,7 +273,7 @@ Point getPupilCenter(Mat &face, Rect eye){
 		float* row = out.ptr<float>(y);
 		for (int x = 0; x < out.cols; ++x)
 		{
-			float val = row[x];
+			float val = row[x]*row[x];
 			if(val > 0){
 				sum += val;
 				sum_x += val*x;
@@ -275,23 +281,23 @@ Point getPupilCenter(Mat &face, Rect eye){
 			}
 		}
 	}
-	Point max = Point(sum_x/sum, sum_y/sum);
+	CvPoint2D32f max = cvPoint2D32f(sum_x/sum, sum_y/sum);
 	circle(out, max, 3, 0);
-	//imshow("cam", out / max_val);
+	//imshow("thresh", out / max_val);
 	return max;
 }
 
-//get positions of corners of eye
-Point getEyeCenter(Mat &face_frame, Rect eye){
+//get position of center of eye
+CvPoint2D32f getEyeCenter(Mat &face_frame, Rect eye){
 	//crop eye to get rid of some noise
 	int crop_y = 10;
 	eye.y += crop_y;
 	eye.height -= crop_y * 2;
 	//eye.width -= 20;
-	
+
 	Mat eye_color = face_frame(eye);
 	Mat eye_scelra;
-	
+
 	//convert to HSV and get saturation channel
 	cvtColor(eye_color, eye_scelra, CV_RGB2HSV);
 	std::vector<Mat> hsvChannels(3);
@@ -311,9 +317,9 @@ Point getEyeCenter(Mat &face_frame, Rect eye){
 	//threshold(eye_scelra, eye_scelra, 10, 255, THRESH_BINARY_INV);		//threshold type 3, thesh. to 0
 
 	//calc center of mass
-	double sum = 0;
-	double sum_x = 0;
-	double sum_y = 0;
+	float sum = 0;
+	float sum_x = 0;
+	float sum_y = 0;
 	for (int y = 0; y < eye_scelra.rows; ++y)
 	{
 		uchar* row = eye_scelra.ptr<uchar>(y);
@@ -324,9 +330,8 @@ Point getEyeCenter(Mat &face_frame, Rect eye){
 			sum_y += row[x]*y;
 		}
 	}
-	Point max = Point(sum_x/sum, sum_y/sum);
-
-	circle(eye_scelra, max, 3, 0);
+	CvPoint2D32f max = cvPoint2D32f(sum_x/sum, sum_y/sum);
+	//circle(eye_scelra, max, 3, 0);
 	//imshow("eye", eye_scelra);
 	//adjust for crop
 	max.y += crop_y;
