@@ -13,7 +13,7 @@ using namespace std;
 #define EYE_SIDE 		0.13
 #define EYE_HEIGHT 		0.30
 #define EYE_WIDTH 		0.35
-#define EYE_FRAME_SIZE	80		//size to resize eye box for speed
+#define EYE_FRAME_SIZE	60		//size to resize eye box for speed
 #define EYE_GRADIENT_THRESH	0.3
 #define EYE_SCELRA_THRESH	30
 #define EYE_BLUR_SIZE	3
@@ -207,13 +207,13 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	gradientY = gradientY.mul(mags);
 	gradientX = gradientX.mul(mags);
 
-	//imshow("gradY", gradientY * 255);
-	//imshow("gradX", gradientX * 255);
-
 	//resize arrays to same size
 	resize(gradientX, gradientX, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
 	resize(gradientY, gradientY, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
 	resize(weight, weight, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
+
+	imshow("gradY", gradientY * 255);
+	imshow("weight", weight / 255);
 
 	//run the algorithm:
 	//	for each possible gradient location
@@ -277,8 +277,12 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 
 	imshow("calc", out / max_val);
 
+	//TODO: calc histogram and threshold based on
+	//number of pixels in top end. get at least 10 pixels
+	//or so in the top end
+
 	//threshold to get just the pupil
-	threshold(out, out, 0.90 * max_val, max_val, THRESH_TOZERO);
+	threshold(out, out, 0.92 * max_val, max_val, THRESH_TOZERO);
 
 	//calc center of mass
 	float sum = 0;
