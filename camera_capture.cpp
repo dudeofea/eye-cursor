@@ -7,9 +7,6 @@
 using namespace cv;
 using namespace std;
 
-//Globals
-CascadeClassifier face_cascade;
-
 //Constants
 #define FACE_SMOOTH 	0.0005
 #define EYE_TOP 		0.25	//eye measurements relative to face box
@@ -20,6 +17,10 @@ CascadeClassifier face_cascade;
 #define EYE_GRADIENT_THRESH	0.3
 #define EYE_SCELRA_THRESH	30
 #define EYE_BLUR_SIZE	3
+
+//Globals
+CascadeClassifier face_cascade;
+float dpX[EYE_FRAME_SIZE*EYE_FRAME_SIZE], dpY[EYE_FRAME_SIZE*EYE_FRAME_SIZE];
 
 void getGazePosition(Mat &frame);
 Mat toHueScale(Mat img);
@@ -36,6 +37,14 @@ int main() {
 	if(!face_cascade.load(face_cascade_name)){
 		cout << "Could not find face cascade file: " + face_cascade_name + "\n";
 		return -1;
+	}
+	//load up vector lookup tables
+	for (size_t y = 0; y < EYE_FRAME_SIZE; y++) {
+		for (int x = 0; x < EYE_FRAME_SIZE; ++x) {
+			float magnitude = sqrt((x * x) + (y * y));
+			dpX[x+EYE_FRAME_SIZE*y] = (float)x / magnitude;
+			dpY[x+EYE_FRAME_SIZE*y] = (float)y / magnitude;
+		}
 	}
 
 	//loop forever
@@ -201,10 +210,6 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	//imshow("gradY", gradientY * 255);
 	//imshow("gradX", gradientX * 255);
 
-	//TODO: speed improvements
-	//	- use lookup table of unit vectors (normalized dx and dy)
-	//	- confine search area of center to fixed range (say 20x20 pixels)
-
 	//resize arrays to same size
 	resize(gradientX, gradientX, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
 	resize(gradientY, gradientY, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
@@ -235,14 +240,20 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 						continue;
 					}
 					//create a vector from the possible center to the gradient origin
-					float dx = x - cx;
-					float dy = y - cy;
+					int dx = x - cx;
+					int dy = y - cy;
 
-					//normalize d
-					float magnitude = sqrt((dx * dx) + (dy * dy));
-					dx = dx / magnitude;
-					dy = dy / magnitude;
-					float dotProduct = dx*gX + dy*gY;
+					//compute dot product using lookup table
+					float dotProduct;
+					if(dx > 0 && dy > 0){
+						dotProduct = dpX[dx+EYE_FRAME_SIZE*dy]*gX + dpY[dx+EYE_FRAME_SIZE*dy]*gY;
+					}else if(dx > 0){
+						dotProduct = dpX[dx-EYE_FRAME_SIZE*dy]*gX - dpY[dx-EYE_FRAME_SIZE*dy]*gY;
+					}else if(dy > 0){
+						dotProduct = -dpX[-dx+EYE_FRAME_SIZE*dy]*gX - dpY[-dx+EYE_FRAME_SIZE*dy]*gY;
+					}else{
+						dotProduct = -dpX[-dx-EYE_FRAME_SIZE*dy]*gX - dpY[-dx-EYE_FRAME_SIZE*dy]*gY;
+					}
 
 					//ignore negative dot products as they point away from eye
 					if(dotProduct <= 0.0){
@@ -250,7 +261,7 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 					}
 
 					//square and multiply by the weight
-					Or[cx] += dotProduct * dotProduct * Wr[cx];
+					Or[cx] += dotProduct * Wr[cx];
 
 					//compare with max
 					if(Or[cx] > max_val){
@@ -267,7 +278,7 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	imshow("calc", out / max_val);
 
 	//threshold to get just the pupil
-	threshold(out, out, 0.95 * max_val, max_val, THRESH_TOZERO);
+	threshold(out, out, 0.90 * max_val, max_val, THRESH_TOZERO);
 
 	//calc center of mass
 	float sum = 0;
