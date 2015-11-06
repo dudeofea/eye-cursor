@@ -261,7 +261,7 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 					}
 
 					//square and multiply by the weight
-					Or[cx] += dotProduct * Wr[cx];
+					Or[cx] += dotProduct * dotProduct * Wr[cx];
 
 					//compare with max
 					if(Or[cx] > max_val){
@@ -275,14 +275,47 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	//resize for debugging
 	resize(out, out, Size(500,500), 0, 0, INTER_NEAREST);
 
-	imshow("calc", out / max_val);
+	out = 255 * out / max_val;
+	imshow("calc", out / 255);
 
-	//TODO: calc histogram and threshold based on
-	//number of pixels in top end. get at least 10 pixels
-	//or so in the top end
+	//histogram setup
+	Mat hist;
+	int histSize = 256;
+	float range[] = { 0, 256 } ;
+	const float* histRange = { range };
+	//calculate the histogram
+	calcHist(&out,1, 0, Mat(), hist, 1, &histSize, &histRange,
+		true,	//uniform
+		true	//accumulate
+	);
+
+	//get cutoff for top 10 pixels
+	float top_end_sum = 0;
+	int top_end = 0.92 * 255;
+	for (int i = 255; i > 0; i--) {
+		top_end_sum += hist.at<float>(i);
+		if(top_end_sum > 3000){
+			top_end = i;
+			break;
+		}
+	}
+
+	//draw image for debugging
+	Mat histImage(400, 512, CV_8UC3, Scalar(0,0,0));
+	int bin_w = cvRound( (double) 512/histSize );
+	normalize(hist, hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+	/// Draw for each channel
+	for( int i = 1; i < histSize; i++)
+	{
+		line(histImage, Point(bin_w*(i), 400 - cvRound(hist.at<float>(i))),
+						Point(bin_w*(i), 400),
+						Scalar(i, i, i), 2, 8, 0);
+	}
+	imshow("hist", histImage);
 
 	//threshold to get just the pupil
-	threshold(out, out, 0.92 * max_val, max_val, THRESH_TOZERO);
+	//printf("top_end: %d\n", top_end);
+	threshold(out, out, top_end, 255, THRESH_TOZERO);
 
 	//calc center of mass
 	float sum = 0;
@@ -303,7 +336,7 @@ CvPoint2D32f getPupilCenter(Mat &face, Rect eye){
 	}
 	CvPoint2D32f max = cvPoint2D32f(sum_x/sum, sum_y/sum);
 	circle(out, max, 3, 0);
-	imshow("thresh", out / max_val);
+	imshow("thresh", out / 255);
 	return max;
 }
 
