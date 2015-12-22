@@ -6,3 +6,6 @@ Progress: ~70%
 What's missing:
 * Calibration / Scaling with the screen
 * X11 mouse integration
+
+# Installation
+requires OpenCV
