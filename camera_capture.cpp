@@ -27,7 +27,7 @@ Mat toHueScale(Mat img);
 
 int main() {
 	//get camera stream
-	VideoCapture stream1(0);   //0 is the id of video device
+	VideoCapture stream1(1);   //id of video device
 	if (!stream1.isOpened()) {
 		cout << "cannot open camera";
 	}
