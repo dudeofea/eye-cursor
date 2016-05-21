@@ -26,6 +26,6 @@ So far, I haven't found any free, open source alternatives to this (a webcam-onl
 * [Pupil](https://github.com/pupil-labs/pupil) (open software/hardware, but maybe not everyone knows how to solder their webcam)
 * [theeyetribe](http://theeyetribe.com/) ($200)
 * [GazeHawk](http://gazehawk.com/) (quote "Our proprietary eye tracking technology...")
-* [Sticky](https://sticky.ad/) (proprietary / I think they do the analasis server-side?)
+* [Sticky](https://sticky.ad/) (proprietary / I think they do the analysis server-side?)
 
 If you know of an alternatives, feel free to email me about it
