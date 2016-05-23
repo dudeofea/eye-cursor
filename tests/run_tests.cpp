@@ -12,10 +12,14 @@ using namespace std;
 typedef int (*TestFunction) (TestCase tc);
 
 int main(int argc, char const *argv[]) {
-	//run all tests
-	TestCase *t;
-	PupilTests p;
-	t = &p;
-	t->run_tests();
+	//run all tests of all types
+	vector<TestCase*> all_tests;
+	all_tests.push_back(new PupilTests());
+	//free the allocated memory
+	for( vector<TestCase*>::iterator i = all_tests.begin(); i != all_tests.end(); ++i ){
+		(*i)->run_tests();
+		delete *i;
+	}
+	all_tests.clear();
 	return 0;
 }
