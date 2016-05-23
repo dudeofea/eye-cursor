@@ -12,6 +12,7 @@ using namespace std;
 typedef int (*TestFunction) (TestCase tc);
 
 int main(int argc, char const *argv[]) {
+	//run all tests
 	TestCase *t;
 	PupilTests p;
 	t = &p;
