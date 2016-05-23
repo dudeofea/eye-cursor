@@ -3,7 +3,9 @@
 #include <dirent.h>
 #include <vector>
 #include <algorithm>
-#include <string> 
+#include <string>
+#include <cmath>
+#include <ctime>
 #include "testcase.hpp"
 using namespace std;
 

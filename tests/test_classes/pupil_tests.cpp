@@ -11,7 +11,9 @@
 
 class PupilImage {
 	public:
-		int center_x, center_y;
+		float center_x, center_y;
+		float time_ms;
+		float error_rate;
 		string image_path;
 		//constructor
 		PupilImage(string filename){
@@ -21,10 +23,37 @@ class PupilImage {
 			size_t dash2 = filename.find("-", dash1+1);
 			string x_str = filename.substr(slash+1, dash1-slash-1);
 			string y_str = filename.substr(dash1+1, dash2-dash1-1);
-			center_x = stoi(x_str);
-			center_y = stoi(y_str);
+			center_x = stof(x_str);
+			center_y = stof(y_str);
 			//store the file location
 			image_path = filename;
+		}
+		//test the image using the pupil center function
+		void test(){
+			//load the image
+			Mat test_image = this->load();
+			//get blue channel, less noisy
+			std::vector<Mat> test_image_rgb(3);
+			split(test_image, test_image_rgb);
+			Mat test_image_gray = test_image_rgb[2];
+			//start the timer
+			int timer_iterations = 10;	//how many times to run
+			CvPoint2D32f result;
+			std::clock_t start = std::clock();
+			//run the algorithm
+			for (int i = 0; i < timer_iterations; i++) {
+				result = getPupilCenter(test_image_gray);
+			}
+			//print time
+			std::cout << "Time: " << (std::clock() - start) / (double)(timer_iterations * CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
+			//waitKey(0);                                         	 // Wait for a keystroke in the window
+			//calc error
+			cout << "answer: (" + to_string(center_x)+","+to_string(center_y)+")\n";
+			cout << "result: (" + to_string(result.x)+","+to_string(result.y)+")\n";
+			float error_x = 100*abs(center_x-result.x)/result.x;
+			float error_y = 100*abs(center_y-result.y)/result.y;
+			float error = sqrt(error_x*error_x + error_y*error_y);
+			cout << "error: "+to_string(error)+"%\n";
 		}
 		//load the image for use in testing
 		Mat load(){
@@ -34,10 +63,8 @@ class PupilImage {
 				return image;
 			}
 
-			namedWindow( "Display window", WINDOW_AUTOSIZE );		// Create a window for display.
-			imshow( "Display window", image );                   	// Show our image inside it.
-
-			waitKey(0);                                         	 // Wait for a keystroke in the window
+			//namedWindow( "Display window", WINDOW_AUTOSIZE );		// Create a window for display.
+			//imshow( "Display window", image );                   	// Show our image inside it.
 			return image;
 		}
 };
@@ -77,6 +104,6 @@ void PupilTests::run_tests(){
 	vector<float> times;
 	vector<float> error;
 	for(vector<int>::size_type i = 0; i != test_images.size(); i++) {
-		test_images[i].load();
+		test_images[i].test();
 	}
 }

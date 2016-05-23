@@ -137,8 +137,8 @@ CvPoint2D32f getPupilCenter(Mat &eye_box){
 	resize(gradientY, gradientY, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
 	resize(weight, weight, Size(EYE_FRAME_SIZE, EYE_FRAME_SIZE), 0, 0, INTER_NEAREST);
 
-	imshow("gradY", gradientY * 255);
-	imshow("weight", weight / 255);
+	//imshow("gradY", gradientY * 255);
+	//imshow("weight", weight / 255);
 
 	//run the algorithm:
 	//	for each possible gradient location
@@ -201,7 +201,7 @@ CvPoint2D32f getPupilCenter(Mat &eye_box){
 	resize(out, out, Size(500,500), 0, 0, INTER_NEAREST);
 
 	out = 255 * out / max_val;
-	imshow("calc", out / 255);
+	//imshow("calc", out / 255);
 
 	//histogram setup
 	Mat hist;
@@ -236,7 +236,7 @@ CvPoint2D32f getPupilCenter(Mat &eye_box){
 						Point(bin_w*(i), 400),
 						Scalar(i, i, i), 2, 8, 0);
 	}
-	imshow("hist", histImage);
+	//imshow("hist", histImage);
 
 	//threshold to get just the pupil
 	//printf("top_end: %d\n", top_end);
@@ -261,7 +261,7 @@ CvPoint2D32f getPupilCenter(Mat &eye_box){
 	}
 	CvPoint2D32f max = cvPoint2D32f(sum_x/sum, sum_y/sum);
 	circle(out, max, 3, 0);
-	imshow("thresh", out / 255);
+	//imshow("thresh", out / 255);
 	return max;
 }
 
