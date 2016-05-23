@@ -259,8 +259,14 @@ CvPoint2D32f getPupilCenter(Mat &eye_box){
 			}
 		}
 	}
-	CvPoint2D32f max = cvPoint2D32f(sum_x/sum, sum_y/sum);
-	circle(out, max, 3, 0);
+	Size eye_box_size = eye_box.size();
+	Size out_size = out.size();
+	//cout << "Size1: "+to_string(eye_box_size.width)+","+to_string(eye_box_size.height)+"\n";
+	//cout << "Size2: "+to_string(out_size.width)+","+to_string(out_size.height)+"\n";
+	float x_scale = (float) eye_box_size.width / out_size.width;
+	float y_scale = (float) eye_box_size.height / out_size.height;
+	CvPoint2D32f max = cvPoint2D32f(x_scale*sum_x/sum, y_scale*sum_y/sum);
+	//circle(out, max, 3, 0);
 	//imshow("thresh", out / 255);
 	return max;
 }

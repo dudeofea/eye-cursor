@@ -45,11 +45,12 @@ class PupilImage {
 				result = getPupilCenter(test_image_gray);
 			}
 			//print time
-			std::cout << "Time: " << (std::clock() - start) / (double)(timer_iterations * CLOCKS_PER_SEC / 1000) << " ms" << std::endl;
-			//waitKey(0);                                         	 // Wait for a keystroke in the window
+			int slash = image_path.find_last_of('/');
+			std::cout << "pupil: " + image_path.substr(slash+1) << "\t\t" << (std::clock() - start) / (double)(timer_iterations * CLOCKS_PER_SEC / 1000) << "ms\t";
+			waitKey(0);                                         	 // Wait for a keystroke in the window
 			//calc error
-			cout << "answer: (" + to_string(center_x)+","+to_string(center_y)+")\n";
-			cout << "result: (" + to_string(result.x)+","+to_string(result.y)+")\n";
+			//cout << "answer: (" + to_string(center_x)+","+to_string(center_y)+")\n";
+			//cout << "result: (" + to_string(result.x)+","+to_string(result.y)+")\n";
 			float error_x = 100*abs(center_x-result.x)/result.x;
 			float error_y = 100*abs(center_y-result.y)/result.y;
 			float error = sqrt(error_x*error_x + error_y*error_y);
