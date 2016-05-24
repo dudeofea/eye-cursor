@@ -6,15 +6,13 @@
 //	and compares the output of the algorithm
 //	to human-picked pupil centers for accuracy.
 //
-#include "../../eyelib.hpp"
 #include "pupil_tests.hpp"
 
-class PupilImage {
+class PupilImage: public ImageTest {
 	public:
 		float center_x, center_y;
 		float time_ms;
 		float error_rate;
-		string image_path;
 		//constructor
 		PupilImage(string filename){
 			//get center from filename
@@ -72,7 +70,7 @@ class PupilImage {
 
 void PupilTests::run_tests(){
 	//load the test data
-	vector<string> images_paths = get_images("test_images/pupil_images");
+	vector<string> images_paths = get_images("test_images/eye_images");
 	vector<PupilImage> test_images;
 	for(vector<int>::size_type i = 0; i != images_paths.size(); i++) {
 		test_images.push_back(PupilImage(images_paths[i]));

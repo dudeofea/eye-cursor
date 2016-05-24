@@ -4,6 +4,18 @@ void TestCase::run_tests(){
 	cout << "I'm a test case";
 }
 
+Mat ImageTest::load_test_image(){
+	Mat image = imread(image_path, CV_LOAD_IMAGE_COLOR);   		// Read the file
+	if(! image.data ){
+		cout <<  "Could not open or find the image" << std::endl ;
+		return image;
+	}
+
+	//namedWindow( "Display window", WINDOW_AUTOSIZE );		// Create a window for display.
+	//imshow( "Display window", image );                   	// Show our image inside it.
+	return image;
+}
+
 vector<string> get_images(const char *images_dir){
 	//get all images to test
 	vector<string> images_paths;
