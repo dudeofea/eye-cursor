@@ -71,16 +71,27 @@ class PupilImage: public ImageTest {
 void PupilTests::run_tests(){
 	//load the test data
 	vector<string> images_paths = get_images("test_images/eye_images");
-	vector<PupilImage> test_images;
-	for(vector<int>::size_type i = 0; i != images_paths.size(); i++) {
-		test_images.push_back(PupilImage(images_paths[i]));
+	ifstream json_file("test_images/eye_images/test_data.json", ifstream::binary);
+	Json::Value test_data;
+	Json::Reader reader;
+	std::ifstream test("testis.json", std::ifstream::binary);
+	bool parsingSuccessful = reader.parse(json_file, test_data, false);
+	if (!parsingSuccessful){
+	    // report to the user the failure and their locations in the document.
+	    cout << "Failed to parse configuration\n" << reader.getFormattedErrorMessages();
+		return;
 	}
-	//load gradient lookup tables
-	calcGradientLookup();
-	//run the tests
-	vector<float> times;
-	vector<float> error;
-	for(vector<int>::size_type i = 0; i != test_images.size(); i++) {
-		test_images[i].test();
-	}
+	cout << "File: " << test_data["pupil_positions"]["bll-a"] << "\n";
+	// vector<PupilImage> test_images;
+	// for(vector<int>::size_type i = 0; i != images_paths.size(); i++) {
+	// 	test_images.push_back(PupilImage(images_paths[i]));
+	// }
+	// //load gradient lookup tables
+	// calcGradientLookup();
+	// //run the tests
+	// vector<float> times;
+	// vector<float> error;
+	// for(vector<int>::size_type i = 0; i != test_images.size(); i++) {
+	// 	test_images[i].test();
+	// }
 }
