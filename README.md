@@ -18,7 +18,9 @@ https://github.com/jayrambhia/Install-OpenCV
 
 # Alternatives
 
-So far, I haven't found any free, open source alternatives to this (a webcam-only gaze-tracker to be specific). Here are the projects/companies I've found in trying:
+This awesome thing: [WebGazer](https://github.com/brownhci/WebGazer)
+
+Here are some other links for non-open source / non-webcam projects:
 
 * [xLabs](https://xlabsgaze.com/) (not open source, takes a bit of training)
 * [GazeRecorder](https://www.facebook.com/gazerecorder) (sort of open source. windows-only, and where's the code?)
@@ -27,5 +29,3 @@ So far, I haven't found any free, open source alternatives to this (a webcam-onl
 * [theeyetribe](http://theeyetribe.com/) ($200)
 * [GazeHawk](http://gazehawk.com/) (quote "Our proprietary eye tracking technology...")
 * [Sticky](https://sticky.ad/) (proprietary / I think they do the analysis server-side?)
-
-If you know of an alternatives, feel free to email me about it
