@@ -65,7 +65,7 @@ class PupilImage: public ImageTest {
 
 void PupilTests::run_tests(){
 	//load the test data
-	ifstream json_file("test_images/eye_images/test_data.json", ifstream::binary);
+	ifstream json_file("test_images/eye_images/labels.json", ifstream::binary);
 	Json::Value test_data;
 	Json::Reader reader;
 	std::ifstream test("testis.json", std::ifstream::binary);

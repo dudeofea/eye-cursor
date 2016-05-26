@@ -29,3 +29,9 @@ Here are some other links for non-open source / non-webcam projects:
 * [theeyetribe](http://theeyetribe.com/) ($200)
 * [GazeHawk](http://gazehawk.com/) (quote "Our proprietary eye tracking technology...")
 * [Sticky](https://sticky.ad/) (proprietary / I think they do the analysis server-side?)
+
+# Images
+
+The images I use for testing were either taken by me, or are modified/original versions of images I found on the [LFW Face Database](http://vis-www.cs.umass.edu/lfw/#reference)
+
+Feel free to use any of the images I've provided for whatever you'd like
