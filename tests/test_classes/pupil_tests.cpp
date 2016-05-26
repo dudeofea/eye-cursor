@@ -14,17 +14,12 @@ class PupilImage: public ImageTest {
 		float time_ms;
 		float error_rate;
 		//constructor
-		PupilImage(string filename){
-			//get center from filename
-			size_t slash = filename.find_last_of("/");
-			size_t dash1 = filename.find("-", slash+1);
-			size_t dash2 = filename.find("-", dash1+1);
-			string x_str = filename.substr(slash+1, dash1-slash-1);
-			string y_str = filename.substr(dash1+1, dash2-dash1-1);
-			center_x = stof(x_str);
-			center_y = stof(y_str);
+		PupilImage(Json::Value json_data, string filename){
+			Json::ValueIterator itr = json_data["pupil_positions"][filename].begin();
+			center_x = stof(itr->asString()); itr++;
+			center_y = stof(itr->asString());
 			//store the file location
-			image_path = filename;
+			image_path = "test_images/eye_images/" + filename + ".jpg";
 		}
 		//test the image using the pupil center function
 		void test(){
@@ -70,7 +65,6 @@ class PupilImage: public ImageTest {
 
 void PupilTests::run_tests(){
 	//load the test data
-	vector<string> images_paths = get_images("test_images/eye_images");
 	ifstream json_file("test_images/eye_images/test_data.json", ifstream::binary);
 	Json::Value test_data;
 	Json::Reader reader;
@@ -81,17 +75,16 @@ void PupilTests::run_tests(){
 	    cout << "Failed to parse configuration\n" << reader.getFormattedErrorMessages();
 		return;
 	}
-	cout << "File: " << test_data["pupil_positions"]["bll-a"] << "\n";
-	// vector<PupilImage> test_images;
-	// for(vector<int>::size_type i = 0; i != images_paths.size(); i++) {
-	// 	test_images.push_back(PupilImage(images_paths[i]));
-	// }
-	// //load gradient lookup tables
-	// calcGradientLookup();
-	// //run the tests
-	// vector<float> times;
-	// vector<float> error;
-	// for(vector<int>::size_type i = 0; i != test_images.size(); i++) {
-	// 	test_images[i].test();
-	// }
+	vector<PupilImage> test_images;
+	for(Json::ValueIterator itr = test_data["pupil_positions"].begin() ; itr != test_data["pupil_positions"].end() ; itr++) {
+		test_images.push_back(PupilImage(test_data, itr.key().asString()));
+    }
+	//load gradient lookup tables
+	calcGradientLookup();
+	//run the tests
+	vector<float> times;
+	vector<float> error;
+	for(vector<int>::size_type i = 0; i != test_images.size(); i++) {
+		test_images[i].test();
+	}
 }
