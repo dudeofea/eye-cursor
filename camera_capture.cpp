@@ -25,9 +25,24 @@ float dpX[EYE_FRAME_SIZE*EYE_FRAME_SIZE], dpY[EYE_FRAME_SIZE*EYE_FRAME_SIZE];
 void getGazePosition(Mat &frame);
 Mat toHueScale(Mat img);
 
+//Get the number of cameras available
+int countCameras(){
+	VideoCapture temp_camera;
+	int maxTested = 10;
+	for (int i = 0; i < maxTested; i++){
+		VideoCapture temp_camera(i);
+		bool res = (!temp_camera.isOpened());
+		temp_camera.release();
+		if (res){
+			return i;
+		}
+	}
+	return maxTested;
+}
+
 int main() {
 	//get camera stream
-	VideoCapture stream1(1);   //id of video device
+	VideoCapture stream1(countCameras());   //id of video device
 	if (!stream1.isOpened()) {
 		cout << "cannot open camera";
 	}
