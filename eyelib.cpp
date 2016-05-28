@@ -1,5 +1,7 @@
 #include "eyelib.hpp"
 
+//TODO: try using an elipse-contour based detection for the pupils
+
 //Globals
 CascadeClassifier face_cascade;
 float dpX[EYE_FRAME_SIZE*EYE_FRAME_SIZE], dpY[EYE_FRAME_SIZE*EYE_FRAME_SIZE];
