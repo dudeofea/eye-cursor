@@ -107,7 +107,12 @@ Mat matrixMagnitude(Mat &matX, Mat &matY) {
 	return mags;
 }
 
-CvPoint2D32f getPupilCenter(Mat &eye_box){
+CvPoint2D32f getPupilCenter(Mat &eye_box_color){
+	CvPoint2D32f result;
+	//get blue channel, less noisy
+	std::vector<Mat> eye_box_rgb(3);
+	split(eye_box_color, eye_box_rgb);
+	Mat eye_box = eye_box_rgb[2];
 	//find x and y gradients
 	Mat gradientX = computeGradient(eye_box);
 	Mat gradientY = computeGradient(eye_box.t()).t();
@@ -118,7 +123,34 @@ CvPoint2D32f getPupilCenter(Mat &eye_box){
 	//create a blurred and inverted image for weighting
 	Mat weight;
 	bitwise_not(eye_box, weight);
+	imshow("eye", eye_box_color);
 	blur(weight, weight, Size(2,2));
+
+	//apply histogram equalization
+	Mat eye_out;
+	equalizeHist(eye_box, eye_out);
+	imshow("eye eq", eye_out);
+
+	// compute canny (don't blur with that image quality!!)
+	Mat canny;
+    cv::Canny(eye_out, canny, 200, 20);
+    cv::namedWindow("canny2"); cv::imshow("canny2", canny>0);
+
+	/// Apply the Hough Transform to find the circles
+	vector<Vec3f> circles;
+    cv::HoughCircles(eye_out, circles, CV_HOUGH_GRADIENT, 1, 60, 200, 20, 0, 0 );
+
+    /// Draw the circles detected
+	cvtColor(eye_out, eye_out, CV_GRAY2RGB);
+    for( size_t i = 0; i < circles.size(); i++ )
+    {
+        Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+        int radius = cvRound(circles[i][2]);
+		cout << "Radius: " << radius << " position: " << center << "\n";
+        cv::circle(eye_out, center, 3, Scalar(0,255,255), -1);
+        cv::circle(eye_out, center, radius, Scalar(0,0,255), 1);
+    }
+	imshow("eye2", eye_out);
 
 	//weight the magnitudes, convert to 8-bit for thresholding
 	weight.convertTo(weight, CV_32F);
