@@ -40,7 +40,7 @@ class PupilImage: public ImageTest {
 			//print time
 			int slash = image_path.find_last_of('/');
 			std::cout << "pupil: " + image_path.substr(slash+1) << "\t\t" << (std::clock() - start) / (double)(timer_iterations * CLOCKS_PER_SEC / 1000) << "ms\t";
-			waitKey(0);                                         	 // Wait for a keystroke in the window
+			//waitKey(0);                                         	 // Wait for a keystroke in the window
 			//calc error
 			//cout << "answer: (" + to_string(center_x)+","+to_string(center_y)+")\n";
 			//cout << "result: (" + to_string(result.x)+","+to_string(result.y)+")\n";
