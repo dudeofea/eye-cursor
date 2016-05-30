@@ -131,26 +131,35 @@ CvPoint2D32f getPupilCenter(Mat &eye_box_color){
 	equalizeHist(eye_box, eye_out);
 	imshow("eye eq", eye_out);
 
-	// compute canny (don't blur with that image quality!!)
-	Mat canny;
-    cv::Canny(eye_out, canny, 200, 20);
-    cv::namedWindow("canny2"); cv::imshow("canny2", canny>0);
+	//Run laplacian edge detection
+	Mat dst, abs_dst;
+	Laplacian(eye_out, dst, CV_16S, 3, 1, 0, BORDER_DEFAULT);
+	convertScaleAbs(dst, abs_dst);
+	threshold(abs_dst, abs_dst, 100, 0, THRESH_TOZERO);
+	imshow("laplace", abs_dst);
+
+	// // compute canny (don't blur with that image quality!!)
+	// Mat canny;
+    // cv::Canny(eye_out, canny, 200, 20);
+    // cv::namedWindow("canny2"); cv::imshow("canny2", canny>0);
 
 	/// Apply the Hough Transform to find the circles
 	vector<Vec3f> circles;
-    cv::HoughCircles(eye_out, circles, CV_HOUGH_GRADIENT, 1, 60, 200, 20, 0, 0 );
+    cv::HoughCircles(abs_dst, circles, CV_HOUGH_GRADIENT, 1, 60, 200, 20, 0, 0 );
 
     /// Draw the circles detected
-	cvtColor(eye_out, eye_out, CV_GRAY2RGB);
+	cvtColor(abs_dst, abs_dst, CV_GRAY2RGB);
     for( size_t i = 0; i < circles.size(); i++ )
     {
         Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
         int radius = cvRound(circles[i][2]);
 		cout << "Radius: " << radius << " position: " << center << "\n";
-        cv::circle(eye_out, center, 3, Scalar(0,255,255), -1);
-        cv::circle(eye_out, center, radius, Scalar(0,0,255), 1);
+		Mat eye_temp = abs_dst;
+        cv::circle(eye_temp, center, 3, Scalar(0,255,255), -1);
+        cv::circle(eye_temp, center, radius, Scalar(0,0,255), 1);
+		imshow("eye2", eye_temp);
+		waitKey(0);
     }
-	imshow("eye2", eye_out);
 
 	//weight the magnitudes, convert to 8-bit for thresholding
 	weight.convertTo(weight, CV_32F);

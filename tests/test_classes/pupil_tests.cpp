@@ -26,7 +26,7 @@ class PupilImage: public ImageTest {
 			//load the image
 			Mat test_image = this->load();
 			//start the timer
-			int timer_iterations = 3;	//how many times to run
+			int timer_iterations = 1;	//how many times to run
 			CvPoint2D32f result;
 			std::clock_t start = std::clock();
 			//run the algorithm
