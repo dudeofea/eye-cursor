@@ -1,6 +1,7 @@
 #include "eyelib.hpp"
 
 //TODO: try using an elipse-contour based detection for the pupils
+//TODO: try running k-means on the image and/or running the watershed algorithm
 
 //Globals
 CascadeClassifier face_cascade;
@@ -123,43 +124,20 @@ CvPoint2D32f getPupilCenter(Mat &eye_box_color){
 	//create a blurred and inverted image for weighting
 	Mat weight;
 	bitwise_not(eye_box, weight);
-	imshow("eye", eye_box_color);
+	//imshow("eye", eye_box_color);
 	blur(weight, weight, Size(2,2));
 
 	//apply histogram equalization
 	Mat eye_out;
 	equalizeHist(eye_box, eye_out);
-	imshow("eye eq", eye_out);
-
-	//Run laplacian edge detection
-	Mat dst, abs_dst;
-	Laplacian(eye_out, dst, CV_16S, 3, 1, 0, BORDER_DEFAULT);
-	convertScaleAbs(dst, abs_dst);
-	threshold(abs_dst, abs_dst, 100, 0, THRESH_TOZERO);
-	imshow("laplace", abs_dst);
-
-	// // compute canny (don't blur with that image quality!!)
-	// Mat canny;
-    // cv::Canny(eye_out, canny, 200, 20);
-    // cv::namedWindow("canny2"); cv::imshow("canny2", canny>0);
-
-	/// Apply the Hough Transform to find the circles
-	vector<Vec3f> circles;
-    cv::HoughCircles(abs_dst, circles, CV_HOUGH_GRADIENT, 1, 60, 200, 20, 0, 0 );
-
-    /// Draw the circles detected
-	cvtColor(abs_dst, abs_dst, CV_GRAY2RGB);
-    for( size_t i = 0; i < circles.size(); i++ )
-    {
-        Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-        int radius = cvRound(circles[i][2]);
-		cout << "Radius: " << radius << " position: " << center << "\n";
-		Mat eye_temp = abs_dst;
-        cv::circle(eye_temp, center, 3, Scalar(0,255,255), -1);
-        cv::circle(eye_temp, center, radius, Scalar(0,0,255), 1);
-		imshow("eye2", eye_temp);
-		waitKey(0);
-    }
+	imshow("eye", eye_out);
+	bitwise_not(eye_out, eye_out);
+	Mat dist_mat;
+	distanceTransform(eye_out, dist_mat, CV_DIST_L2, 3);
+	eye_out.convertTo(eye_out, CV_32F, 1.0/255, 0);
+	dist_mat = dist_mat.mul(eye_out);
+	normalize(dist_mat, dist_mat, 0.0, 1.0, NORM_MINMAX);
+	imshow("eye eq", dist_mat);
 
 	//weight the magnitudes, convert to 8-bit for thresholding
 	weight.convertTo(weight, CV_32F);
