@@ -34,4 +34,8 @@ Here are some other links for non-open source / non-webcam projects:
 
 The images I use for testing were either taken by me, or are modified/original versions of images I found on the [LFW Face Database](http://vis-www.cs.umass.edu/lfw/#reference)
 
-Feel free to use any of the images I've provided for whatever you'd like
+# License
+
+I've moved the previous license (MIT) to ORIGINAL_LICENSE, as this software is now sublicensed under GPLv3. For more [info](http://programmers.stackexchange.com/a/105926/93270)
+
+I do not claim copyright ownership, I am simply adding the GPLv3 license to enforce the openness of this software
