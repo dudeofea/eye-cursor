@@ -10,7 +10,7 @@ What's missing:
 
 # Installation
 
-Requires OpenCV, currently being developed on Ubuntu 14.04 LTS. Sorry / Not Sorry if you're using another OS, my focus is on getting a working webcam-only eye-tracker.
+Requires OpenCV, currently being developed on Ubuntu 16.04 LTS, though the eyelib part should compile on anything that can run OpenCV as it has no other dependencies
 
 I recommend the following for installing OpenCV:
 
