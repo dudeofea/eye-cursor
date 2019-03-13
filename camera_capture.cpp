@@ -1,9 +1,8 @@
 #include "eyelib.hpp"
-
-CascadeClassifier face_cascade;
+#include <time.h>
+#include <iomanip>
 
 void getGazePosition(Mat &frame);
-Mat toHueScale(Mat img);
 
 int main(int argc, char** argv) {
 	//check arguments
@@ -23,57 +22,32 @@ int main(int argc, char** argv) {
 		cout << "\nCould not open video source " << argv[1] << "\n";
 		return -1;
 	}
-
 	cout << "              done\n";
-	cout << "Loading face cascade XML...";
-	//load up face detection
-	String face_cascade_name = "haarcascade_frontalface_alt.xml";
-	if(!face_cascade.load(face_cascade_name)){
-		cout << "\nCould not find face cascade file: " + face_cascade_name + "\n";
+
+	//Init Gaze Detector
+	GazeDetection gd;
+	if(gd.initialize() < 0){
 		return -1;
 	}
-	cout << "          done\n";
-	cout << "Calculating gradient lookup tables...";
-	//load lookup tables
-	calcGradientLookup();
-	cout << "done\n";
+
+	//cout formatting
+	cout << std::fixed;
+    cout << std::setprecision(2);
+	float time_scale = 1000.0 / CLOCKS_PER_SEC;
 
 	//loop forever
 	while (true) {
-		cout << "Getting a frame\n";
+		clock_t begin_frame = clock();
+		//process the next frame
 		Mat cameraFrame;
 		stream1.read(cameraFrame);
+		clock_t begin_processing = clock();
+		gd.getGazePosition(cameraFrame);
 
-		getGazePosition(cameraFrame);
+		cout << "frame in " << time_scale * float( begin_processing - begin_frame ) << "ms, processed in " << time_scale * float(clock() - begin_processing) << "ms\n";
 
 		if (waitKey(30) >= 0)
 		break;
 	}
 	return 0;
-}
-
-//returns a 2D vector of where the eyes are pointing
-void getGazePosition(Mat &frame){
-	std::vector<Rect> faces;
-
-	//get blue channel, less noisy
-	std::vector<Mat> rgbChannels(3);
-	split(frame, rgbChannels);
-	Mat frame_gray = rgbChannels[2];
-
-	//detect faces
-	face_cascade.detectMultiScale( frame_gray, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT, Size(150, 150) );
-
-	//show rectangle around faces
-	for(int i = 0; i < faces.size(); i++ )
-	{
-		rectangle(frame, faces[i], 1234);
-	}
-
-	//find eyes in the first (hopefully only) face
-	if (faces.size() > 0) {
-		getEyeVectors(frame, frame_gray, faces[0]);
-	}
-
-	//imshow("cam", frame);
 }

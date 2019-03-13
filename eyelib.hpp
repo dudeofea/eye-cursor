@@ -20,7 +20,15 @@ using namespace std;
 #define EYE_BLUR_SIZE	3
 #define MAX_CAMERAS		20
 
-void calcGradientLookup();
-void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face);
+class GazeDetection {
+public:
+	int initialize();
+	void getGazePosition(Mat &frame);
+private:
+	CascadeClassifier face_cascade;
+	void getGazeVectors(Mat &frame, Mat &frame_grey, Rect face);
+	void getGazeVector(Mat &frame, Mat &frame_grey, Rect eye);
+};
+
 CvPoint2D32f getEyeCenter(Mat &face_frame, Rect eye);
 CvPoint2D32f getPupilCenter(Mat &eye_box);

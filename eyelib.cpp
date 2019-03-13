@@ -5,7 +5,16 @@
 //Globals
 float dpX[EYE_FRAME_SIZE*EYE_FRAME_SIZE], dpY[EYE_FRAME_SIZE*EYE_FRAME_SIZE];
 
-void calcGradientLookup(){
+int GazeDetection::initialize(){
+	cout << "Loading face cascade XML...";
+	//load up face detection
+	String face_cascade_name = "haarcascade_frontalface_alt.xml";
+	if(!face_cascade.load(face_cascade_name)){
+		cout << "\nCould not find face cascade file: " + face_cascade_name + "\n";
+		return -1;
+	}
+	cout << "          done\n";
+	cout << "Calculating gradient lookup tables...";
 	//load up vector lookup tables
 	for (size_t y = 0; y < EYE_FRAME_SIZE; y++) {
 		for (int x = 0; x < EYE_FRAME_SIZE; ++x) {
@@ -14,66 +23,69 @@ void calcGradientLookup(){
 			dpY[x+EYE_FRAME_SIZE*y] = (float)y / magnitude;
 		}
 	}
+	cout << "done\n";
+	return 0;
 }
 
-//get position of pupils
-void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
-	Mat face_frame = frame_gray(face);
-	Mat face_frame_color = frame(face);
+//get position on screen which eyes are looking
+void GazeDetection::getGazePosition(Mat &frame){
+	std::vector<Rect> faces;
 
-	//blur to remove some noise
-	GaussianBlur(face_frame, face_frame, Size( 0, 0 ), FACE_SMOOTH * face.width);
+	//get blue channel, less noisy
+	std::vector<Mat> rgbChannels(3);
+	split(frame, rgbChannels);
+	Mat frame_grey = rgbChannels[2];
 
+	// //detect faces
+	face_cascade.detectMultiScale( frame_grey, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT, Size(150, 150) );
+	// //show rectangle around faces
+	// for(int i = 0; i < faces.size(); i++ )
+	// {
+	// 	rectangle(frame_grey, faces[i], 1234);
+	// }
+
+	//find eyes in the first (hopefully only) face
+	if (faces.size() > 0) {
+		getGazeVectors(frame, frame_grey, faces[0]);
+	}
+
+	//imshow("cam", frame_grey);
+}
+
+//get normal vector of where eyes are looking
+void GazeDetection::getGazeVectors(Mat &frame, Mat &frame_grey, Rect face) {
+	//Mat face_frame = frame_grey(faces[0]);
 	//get eye bounding boxes
+	int eye_region_left = face.width  * (EYE_SIDE);
+	int eye_region_top = face.height * (EYE_TOP) + face.y;
 	int eye_region_width = face.width * (EYE_WIDTH);
 	int eye_region_height = face.width * (EYE_HEIGHT);
-	int eye_region_top = face.height * (EYE_TOP);
-	int eye_region_side =face.width  * (EYE_SIDE);
 	Rect left_eye_box(
-		eye_region_side,
+		eye_region_left + face.x,
 		eye_region_top,
 		eye_region_width,
 		eye_region_height
 	);
 	Rect right_eye_box(
-		face.width - eye_region_width - eye_region_side,
+		face.width - eye_region_width - eye_region_left + face.x,
 		eye_region_top,
 		eye_region_width,
 		eye_region_height
 	);
 
-	//get left center / eye corner
-	CvPoint2D32f left_pupil, left_center;
-	Mat left_eye = face_frame(left_eye_box);
-	left_pupil = getPupilCenter(left_eye);
-	left_center = getEyeCenter(face_frame_color, left_eye_box);
-	//fix offset
-	left_pupil.x  += eye_region_side;
-	left_pupil.y  += eye_region_top;
-	left_center.x += eye_region_side;
-	left_center.y += eye_region_top;
+	getGazeVector(frame, frame_grey, left_eye_box);
+	getGazeVector(frame, frame_grey, right_eye_box);
 
-	//get right center / eye corner
-	CvPoint2D32f right_pupil, right_center;
-	Mat right_eye = face_frame(right_eye_box);
-	right_pupil = getPupilCenter(right_eye);
-	right_center = getEyeCenter(face_frame_color, right_eye_box);
-	//fix offset
-	right_pupil.x  += face.width - eye_region_width - eye_region_side;
-	right_pupil.y  += eye_region_top;
-	right_center.x += face.width - eye_region_width - eye_region_side;
-	right_center.y += eye_region_top;
+	// rectangle(frame, left_eye_box, 1234);
+	// rectangle(frame, right_eye_box, 1234);
+	// imshow("cam", frame);
+}
 
-	circle(face_frame, left_pupil, 2, 200);
-	circle(face_frame, right_pupil, 2, 200);
-	//circle(face_frame, left_center, 3, 200);
-	//circle(face_frame, right_center, 3, 200);
-	//resize for debugging
-	//resize(face_frame, face_frame, Size(500,500), 0, 0, INTER_NEAREST);
-	imshow("cam", face_frame);
+//get vector of where an eye is looking at
+void GazeDetection::getGazeVector(Mat &frame, Mat &frame_grey, Rect eye_rect) {
+	Mat eye = frame(eye_rect);
 
-	//Point left_vec = left_corner - left_pupil;
-	//printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
+	
 }
 
 //returns a matrix with the gradient in the x direction
