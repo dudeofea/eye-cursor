@@ -18,6 +18,7 @@ using namespace std;
 #define EYE_GRADIENT_THRESH	0.3
 #define EYE_SCELRA_THRESH	30
 #define EYE_BLUR_SIZE	3
+#define MAX_CAMERAS		20
 
 void calcGradientLookup();
 void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face);

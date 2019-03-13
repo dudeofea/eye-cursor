@@ -2,3 +2,4 @@ build/*
 .DS_Store
 camera_capture
 tests/run_tests
+*.o

@@ -1,9 +1,8 @@
 #include "eyelib.hpp"
 
-//TODO: try using an elipse-contour based detection for the pupils
+//TODO: try analyzing the whites of the eyes
 
 //Globals
-CascadeClassifier face_cascade;
 float dpX[EYE_FRAME_SIZE*EYE_FRAME_SIZE], dpY[EYE_FRAME_SIZE*EYE_FRAME_SIZE];
 
 void calcGradientLookup(){
@@ -71,7 +70,7 @@ void getEyeVectors(Mat &frame, Mat &frame_gray, Rect face) {
 	//circle(face_frame, right_center, 3, 200);
 	//resize for debugging
 	//resize(face_frame, face_frame, Size(500,500), 0, 0, INTER_NEAREST);
-	//imshow("cam", face_frame);
+	imshow("cam", face_frame);
 
 	//Point left_vec = left_corner - left_pupil;
 	//printf("x: %d, y: %d\n", left_vec.x, left_vec.y);
