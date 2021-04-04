@@ -284,7 +284,7 @@ CvPoint2D32f getEyeCenter(Mat &face_frame, Rect eye){
 	Mat eye_scelra;
 
 	//convert to HSV and get saturation channel
-	cvtColor(eye_color, eye_scelra, CV_RGB2HSV);
+	cvtColor(eye_color, eye_scelra, cv::COLOR_RGB2HSV);
 	std::vector<Mat> hsvChannels(3);
 	split(eye_scelra, hsvChannels);
 	eye_scelra = hsvChannels[1].mul(hsvChannels[2]) / 30;

@@ -19,7 +19,7 @@ class PupilImage: public ImageTest {
 			center_x = stof(itr->asString()); itr++;
 			center_y = stof(itr->asString());
 			//store the file location
-			image_path = "test_images/eye_images/" + filename + ".jpg";
+			image_path = "../tests/test_images/eye_images/" + filename + ".jpg";
 		}
 		//test the image using the pupil center function
 		void test(){
@@ -51,7 +51,7 @@ class PupilImage: public ImageTest {
 		}
 		//load the image for use in testing
 		Mat load(){
-			Mat image = imread(image_path, CV_LOAD_IMAGE_COLOR);   		// Read the file
+			Mat image = imread(image_path, cv::IMREAD_COLOR);		// Read the file
 			if(! image.data ){
 				cout <<  "Could not open or find the image" << std::endl ;
 				return image;
@@ -65,7 +65,7 @@ class PupilImage: public ImageTest {
 
 void PupilTests::run_tests(){
 	//load the test data
-	ifstream json_file("test_images/eye_images/labels.json", ifstream::binary);
+	ifstream json_file("../tests/test_images/eye_images/labels.json", ifstream::binary);
 	Json::Value test_data;
 	Json::Reader reader;
 	std::ifstream test("testis.json", std::ifstream::binary);

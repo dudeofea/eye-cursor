@@ -62,7 +62,12 @@ void getGazePosition(Mat &frame){
 	Mat frame_gray = rgbChannels[2];
 
 	//detect faces
-	face_cascade.detectMultiScale( frame_gray, faces, 1.1, 2, 0|CV_HAAR_SCALE_IMAGE|CV_HAAR_FIND_BIGGEST_OBJECT, Size(150, 150) );
+	face_cascade.detectMultiScale(
+	    frame_gray,
+	    faces,
+	    1.1,
+	    2, 0 | CASCADE_SCALE_IMAGE | CASCADE_FIND_BIGGEST_OBJECT,
+	    Size(150, 150));
 
 	//show rectangle around faces
 	for(int i = 0; i < faces.size(); i++ )

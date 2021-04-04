@@ -5,7 +5,7 @@ void TestCase::run_tests(){
 }
 
 Mat ImageTest::load_test_image(){
-	Mat image = imread(image_path, CV_LOAD_IMAGE_COLOR);   		// Read the file
+	Mat image = imread(image_path, cv::IMREAD_COLOR);		// Read the file
 	if(! image.data ){
 		cout <<  "Could not open or find the image" << std::endl ;
 		return image;

@@ -16,6 +16,18 @@ I recommend the following for installing OpenCV:
 
 https://github.com/jayrambhia/Install-OpenCV
 
+You'll also need `jsoncpp` which can be install on Ubuntu using
+`sudo apt-get install libjsoncpp-dev`
+
+Run the following commands to build
+```
+cd eye-cursor
+mkdir build
+cd build
+cmake ..
+make
+```
+
 # Alternatives
 
 This awesome thing: [WebGazer](https://github.com/brownhci/WebGazer)

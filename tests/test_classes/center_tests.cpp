@@ -23,7 +23,7 @@ class EyeCenterImage: public ImageTest {
 
 void CenterTests::run_tests(){
 	//load the test data
-	vector<string> images_paths = get_images("test_images/eye_images");
+	vector<string> images_paths = get_images("../tests/test_images/eye_images");
 	vector<EyeCenterImage> test_images;
 	for(vector<int>::size_type i = 0; i != images_paths.size(); i++) {
 		test_images.push_back(EyeCenterImage(images_paths[i]));
